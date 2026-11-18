@@ -1,0 +1,954 @@
+:root {
+  --bg-parchment: #fbf2e3;
+  --navy-dark: #102d4f;
+  --navy-mid: #1d4773;
+  --blue-card: #b8cee2;
+  --pill-bg: #faf6ee;
+  --pill-border: #b8b3a8;
+  --text-dark: #102d4f;
+  --text-body: #163252;
+  --white: #ffffff;
+  --radius-box: 22px;
+  --font-display: 'Fredoka', 'Nunito', sans-serif;
+  --font-body: 'Nunito', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100dvh;
+  font-family: var(--font-body);
+  background-color: var(--bg-parchment);
+  color: var(--text-dark);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-wrapper {
+  position: relative;
+  width: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==========================================
+   BARRA DE SOM COMPACTA (SEM SOMBRAS PESADAS)
+   ========================================== */
+.music-topbar {
+  position: fixed;
+  top: 16px;
+  right: 20px;
+  z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  background-color: var(--pill-bg);
+  border: 1.5px solid var(--pill-border);
+  border-radius: 999px;
+}
+
+.music-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-music-toggle {
+  background: var(--navy-dark);
+  color: var(--white);
+  border: 1.5px solid var(--navy-dark);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.86rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.btn-music-toggle:hover {
+  background: var(--navy-mid);
+}
+
+.btn-music-toggle.playing {
+  background: var(--blue-card);
+  color: var(--navy-dark);
+  border-color: var(--navy-dark);
+}
+
+.volume-control-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+}
+
+.btn-mute {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 88px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--blue-card);
+  outline: none;
+  cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--navy-dark);
+  border: 2px solid var(--white);
+  cursor: pointer;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--navy-dark);
+  border: 2px solid var(--white);
+  cursor: pointer;
+}
+
+.volume-percent {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--navy-dark);
+  min-width: 32px;
+  text-align: right;
+}
+
+/* ==========================================
+   PALCO PRINCIPAL FULL-SCREEN (SEM BORDAS/SOMBRAS ESTRANHAS)
+   ========================================== */
+.quiz-stage {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.slides-container {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.slide-card {
+  position: relative;
+  width: 100%;
+  min-height: 100dvh;
+  background-color: var(--bg-parchment);
+  padding: 48px 32px 115px;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  animation: fadeSlide 0.3s ease;
+}
+
+.slide-card.active {
+  display: flex;
+}
+
+@keyframes fadeSlide {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ==========================================
+   TELA 0: CAPA ("Quiz Reflexivo - Jornada de Odisseu")
+   ========================================== */
+.slide-card[data-slide="0"] {
+  padding-bottom: 40px;
+  justify-content: space-between;
+}
+
+.cover-content {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-top: auto;
+  padding-top: 20px;
+}
+
+.title-badge-group {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.title-rays-left,
+.title-rays-right {
+  position: absolute;
+  top: 45%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.title-rays-left {
+  left: -72px;
+}
+
+.title-rays-right {
+  right: -72px;
+}
+
+.main-title-banner {
+  background: var(--navy-dark);
+  color: var(--white);
+  font-family: var(--font-display);
+  font-size: clamp(2.3rem, 5vw, 3.8rem);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 14px 46px 18px;
+  border-radius: 26px;
+  transform: rotate(-2.2deg);
+  position: relative;
+  z-index: 2;
+  line-height: 1.05;
+}
+
+.subtitle-banner {
+  background: var(--blue-card);
+  color: var(--navy-dark);
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 3vw, 2.05rem);
+  font-weight: 700;
+  padding: 9px 34px 11px;
+  border-radius: 16px;
+  transform: rotate(-1.2deg);
+  margin-top: -10px;
+  position: relative;
+  z-index: 3;
+}
+
+.cover-description {
+  font-family: var(--font-body);
+  font-size: clamp(1.15rem, 2.2vw, 1.55rem);
+  font-weight: 800;
+  color: var(--text-dark);
+  max-width: 620px;
+  line-height: 1.35;
+  margin-top: 6px;
+}
+
+/* Cena Ilustrada da Capa */
+.cover-scene {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 1080px;
+  height: clamp(240px, 36vh, 320px);
+  margin-top: auto;
+}
+
+.cover-ship-wrap {
+  position: absolute;
+  left: 2%;
+  bottom: 6px;
+  width: clamp(210px, 26vw, 310px);
+  height: clamp(190px, 24vw, 280px);
+  z-index: 3;
+  animation: shipFloat 4.5s ease-in-out infinite;
+}
+
+.cover-waves-left {
+  position: absolute;
+  left: -4vw;
+  bottom: -42px;
+  width: 65%;
+  max-width: 680px;
+  height: 100px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+@keyframes shipFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+
+.cover-route-svg {
+  position: absolute;
+  left: 24%;
+  top: -20px;
+  width: 72%;
+  height: 230px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.cover-compass-wrap {
+  position: absolute;
+  right: 8%;
+  top: 18px;
+  width: clamp(95px, 12vw, 140px);
+  height: clamp(95px, 12vw, 140px);
+  z-index: 2;
+}
+
+.btn-start-quiz {
+  position: absolute;
+  right: 4%;
+  bottom: 10px;
+  z-index: 5;
+  background: var(--navy-dark);
+  color: var(--white);
+  font-family: var(--font-display);
+  font-size: clamp(1.15rem, 2vw, 1.4rem);
+  font-weight: 700;
+  padding: 13px 32px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.btn-start-quiz:hover {
+  background: var(--navy-mid);
+  transform: translateY(-2px);
+}
+
+.btn-start-quiz .arrow-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+}
+
+.btn-start-quiz:hover .arrow-icon {
+  transform: translateX(4px);
+}
+
+/* ==========================================
+   TELAS 1 A 6: PERGUNTAS (CLEAN & FLAT)
+   ========================================== */
+.question-layout {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  width: 100%;
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+.question-header-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  position: relative;
+}
+
+.question-number-badge {
+  flex-shrink: 0;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--navy-dark);
+  color: var(--white);
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.question-box-wrap {
+  position: relative;
+  flex: 1;
+}
+
+.question-box {
+  background: var(--blue-card);
+  border-radius: var(--radius-box);
+  padding: 22px 30px;
+  color: var(--navy-dark);
+  font-family: var(--font-body);
+  font-size: clamp(1.18rem, 2.3vw, 1.5rem);
+  font-weight: 800;
+  line-height: 1.32;
+  text-align: left;
+}
+
+.question-burst {
+  position: absolute;
+  top: -10px;
+  right: -42px;
+  width: 36px;
+  height: 40px;
+  pointer-events: none;
+}
+
+/* Opções A, B, C, D */
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding-left: 78px;
+}
+
+.option-btn {
+  position: relative;
+  width: 100%;
+  background: var(--pill-bg);
+  border: 1.5px solid var(--pill-border);
+  border-radius: 999px;
+  padding: 8px 22px 8px 8px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  font-family: var(--font-body);
+  color: var(--text-body);
+}
+
+.option-btn:hover {
+  transform: translateX(3px);
+  border-color: var(--navy-dark);
+  background: var(--white);
+}
+
+.option-btn.selected {
+  background: #e6f0fa;
+  border: 2px solid var(--navy-dark);
+}
+
+.option-letter {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--navy-dark);
+  color: var(--white);
+  font-family: var(--font-display);
+  font-size: 1.38rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.option-btn.selected .option-letter {
+  background: var(--navy-mid);
+}
+
+.option-text {
+  font-size: clamp(1rem, 1.9vw, 1.2rem);
+  font-weight: 700;
+  line-height: 1.28;
+  color: var(--text-dark);
+  flex: 1;
+}
+
+.option-check {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--navy-dark);
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.7);
+  transition: all 0.18s ease;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.option-btn.selected .option-check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Rodapé de Navegação das Perguntas */
+.question-nav-footer {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding-left: 78px;
+}
+
+.btn-nav {
+  background: var(--pill-bg);
+  color: var(--navy-dark);
+  border: 1.8px solid var(--navy-dark);
+  border-radius: 999px;
+  padding: 9px 22px;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.btn-nav:hover {
+  background: var(--blue-card);
+  transform: translateY(-1px);
+}
+
+.btn-nav-primary {
+  background: var(--navy-dark);
+  color: var(--white);
+}
+
+.btn-nav-primary:hover {
+  background: var(--navy-mid);
+  color: var(--white);
+}
+
+/* ==========================================
+   TELA 7: MENSAGEM FINAL + ESCOLHAS DA PESSOA
+   (Navio ancorado nas ondas e layout 100% responsivo)
+   ========================================== */
+.slide-card[data-slide="7"] {
+  padding-top: 32px;
+  padding-bottom: 105px;
+}
+
+.final-layout {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 1060px;
+  margin: 0 auto;
+}
+
+.final-banner-group {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.final-banner {
+  background: var(--navy-dark);
+  color: var(--white);
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 3vw, 2.1rem);
+  font-weight: 700;
+  padding: 11px 36px;
+  border-radius: 18px;
+  transform: rotate(-1.3deg);
+  position: relative;
+  z-index: 2;
+}
+
+.final-rays-left,
+.final-rays-right {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-44%);
+  pointer-events: none;
+}
+
+.final-rays-left {
+  left: -84px;
+}
+
+.final-rays-right {
+  right: -84px;
+}
+
+.final-compass-wrap {
+  position: absolute;
+  right: 0;
+  top: 4px;
+  width: clamp(86px, 10vw, 122px);
+  height: clamp(86px, 10vw, 122px);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.final-main-body {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-left: 200px;
+}
+
+.final-message-card {
+  position: relative;
+  z-index: 2;
+  background: var(--blue-card);
+  border-radius: 26px;
+  padding: 22px 38px;
+  width: 100%;
+  max-width: 620px;
+  text-align: center;
+}
+
+.final-message-text {
+  font-family: var(--font-body);
+  font-size: clamp(1.1rem, 2vw, 1.42rem);
+  font-weight: 800;
+  color: var(--navy-dark);
+  line-height: 1.34;
+  margin-bottom: 10px;
+}
+
+.final-message-highlight {
+  font-family: var(--font-display);
+  font-size: clamp(1.05rem, 1.85vw, 1.32rem);
+  font-weight: 700;
+  color: var(--navy-dark);
+}
+
+.final-laurel-wrap {
+  position: absolute;
+  right: -32px;
+  bottom: -12px;
+  width: 62px;
+  height: 86px;
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* Navio na Tela Final: Ancorado sobre as ondas na parte inferior esquerda */
+.final-ship-wrap {
+  position: absolute;
+  left: max(2%, calc(50% - 530px));
+  bottom: 34px;
+  width: clamp(185px, 21vw, 240px);
+  height: clamp(168px, 19vw, 220px);
+  z-index: 3;
+  animation: shipFloat 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Suas Escolhas na Jornada (Grade 3x2 no computador, 1 coluna no celular) */
+.final-choices-box {
+  position: relative;
+  z-index: 4;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.final-choices-title {
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: var(--navy-dark);
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.final-choices-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.choice-item {
+  background: var(--pill-bg);
+  border: 1.5px solid var(--pill-border);
+  border-radius: 14px;
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.choice-q {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--navy-dark);
+  line-height: 1.24;
+}
+
+.choice-q-num {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--navy-dark);
+  color: var(--white);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.choice-a {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--blue-card);
+  border-radius: 9px;
+  padding: 5px 8px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--navy-dark);
+  line-height: 1.2;
+}
+
+.choice-a-letter {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--navy-dark);
+  color: var(--white);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.final-actions-bar {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+/* ==========================================
+   ONDAS DO MAR NO RODAPÉ (100% DA LARGURA)
+   ========================================== */
+.waves-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 88px;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.waves-footer svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ==========================================
+   RESPONSIVIDADE: TABLETS (ATÉ 960px)
+   ========================================== */
+@media (max-width: 960px) {
+  .final-main-body {
+    padding-left: 0;
+  }
+
+  .final-choices-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .final-ship-wrap {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    width: 180px;
+    height: 165px;
+    margin: 10px auto -25px;
+  }
+
+  .final-compass-wrap {
+    top: -10px;
+    right: 0;
+    width: 82px;
+    height: 82px;
+  }
+}
+
+/* ==========================================
+   RESPONSIVIDADE: CELULARES (ATÉ 680px)
+   ========================================== */
+@media (max-width: 680px) {
+  .music-topbar {
+    position: relative;
+    top: auto;
+    right: auto;
+    margin: 12px auto 0;
+    padding: 6px 12px;
+  }
+
+  .slide-card {
+    min-height: calc(100dvh - 54px);
+    padding: 20px 16px 100px;
+  }
+
+  .slide-card[data-slide="0"] {
+    padding-bottom: 24px;
+  }
+
+  .title-rays-left,
+  .title-rays-right,
+  .final-rays-left,
+  .final-rays-right,
+  .question-burst {
+    display: none;
+  }
+
+  .main-title-banner {
+    padding: 12px 26px 14px;
+    font-size: 2.1rem;
+  }
+
+  .subtitle-banner {
+    padding: 7px 22px 9px;
+    font-size: 1.25rem;
+  }
+
+  .cover-scene {
+    height: 230px;
+    margin-top: 16px;
+  }
+
+  .cover-ship-wrap {
+    width: 175px;
+    height: 160px;
+    left: 0;
+    bottom: 24px;
+  }
+
+  .cover-waves-left {
+    width: 75%;
+    height: 75px;
+    bottom: -24px;
+  }
+
+  .cover-compass-wrap {
+    width: 78px;
+    height: 78px;
+    right: 2%;
+    top: 4px;
+  }
+
+  .btn-start-quiz {
+    right: 0;
+    bottom: 0;
+    padding: 11px 22px;
+    font-size: 1.08rem;
+  }
+
+  .question-header-row {
+    gap: 12px;
+  }
+
+  .question-number-badge {
+    width: 46px;
+    height: 46px;
+    font-size: 1.5rem;
+  }
+
+  .question-box {
+    padding: 16px 18px;
+    font-size: 1.1rem;
+    border-radius: 18px;
+  }
+
+  .options-list,
+  .question-nav-footer {
+    padding-left: 0;
+  }
+
+  .option-btn {
+    padding: 7px 14px 7px 7px;
+    gap: 12px;
+  }
+
+  .option-letter {
+    width: 38px;
+    height: 38px;
+    font-size: 1.18rem;
+  }
+
+  .option-text {
+    font-size: 0.98rem;
+  }
+
+  .final-banner {
+    font-size: 1.3rem;
+    padding: 10px 22px;
+  }
+
+  .final-compass-wrap {
+    display: none;
+  }
+
+  .final-message-card {
+    padding: 20px 18px;
+    border-radius: 20px;
+  }
+
+  .final-laurel-wrap {
+    right: -12px;
+    bottom: -10px;
+    width: 48px;
+    height: 68px;
+  }
+
+  .final-choices-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .waves-footer {
+    height: 72px;
+  }
+}
