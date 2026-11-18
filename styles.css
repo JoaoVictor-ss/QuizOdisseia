@@ -167,7 +167,7 @@ html, body {
   width: 100%;
   min-height: 100dvh;
   background-color: var(--bg-parchment);
-  padding: 48px 32px 120px;
+  padding: 28px 32px 140px;
   display: none;
   flex-direction: column;
   align-items: center;
@@ -186,7 +186,7 @@ html, body {
 }
 
 /* ==========================================
-   ONDAS ANIMADAS EM TODA A LARGURA E BARCO EM CIMA DA ONDA
+   ONDAS ANIMADAS MAIS ALTAS E BARCO EM CIMA DA ONDA
    ========================================== */
 @keyframes waveUpDown {
   0%, 100% {
@@ -210,8 +210,8 @@ html, body {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -12px;
-  height: 104px;
+  bottom: -10px;
+  height: 155px;
   z-index: 1;
   pointer-events: none;
 }
@@ -227,9 +227,9 @@ html, body {
    TELA 0: CAPA ("Quiz Reflexivo - Jornada de Odisseu")
    ========================================== */
 .slide-card[data-slide="0"] {
-  padding-top: 36px;
-  padding-bottom: 42px;
-  justify-content: flex-end;
+  padding-top: 28px;
+  padding-bottom: 76px;
+  justify-content: space-between;
 }
 
 .cover-content {
@@ -240,7 +240,7 @@ html, body {
   align-items: center;
   text-align: center;
   width: 100%;
-  margin: auto auto 8px;
+  margin: 0 auto;
 }
 
 .title-badge-group {
@@ -248,7 +248,7 @@ html, body {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .title-rays-left,
@@ -306,13 +306,13 @@ html, body {
   margin-top: 4px;
 }
 
-/* Cena Unificada da Capa: Barco à esquerda + Tracejado por cima + Bússola à direita + Botão no meio embaixo */
+/* Cena Unificada da Capa: Barco pousado na crista da onda + Tracejado por cima + Bússola + Botão no meio */
 .cover-scene {
   position: relative;
   z-index: 3;
   width: 100%;
   max-width: 980px;
-  margin: 0 auto;
+  margin: auto auto 0;
 }
 
 .cover-map-svg {
@@ -330,7 +330,7 @@ html, body {
 .btn-start-quiz {
   position: absolute;
   left: 50%;
-  bottom: 42px;
+  bottom: 44px;
   transform: translateX(-50%);
   z-index: 5;
   background: var(--navy-dark);
@@ -558,8 +558,8 @@ html, body {
    TELA 7: MENSAGEM FINAL + ESCOLHAS (100% CENTRALIZADO)
    ========================================== */
 .slide-card[data-slide="7"] {
-  padding-top: 32px;
-  padding-bottom: 118px;
+  padding-top: 24px;
+  padding-bottom: 138px;
 }
 
 .final-layout {
@@ -671,7 +671,7 @@ html, body {
 .final-ship-wrap {
   position: absolute;
   left: 3%;
-  bottom: 32px;
+  bottom: 72px;
   width: clamp(175px, 18vw, 235px);
   height: clamp(132px, 14vw, 178px);
   z-index: 3;
