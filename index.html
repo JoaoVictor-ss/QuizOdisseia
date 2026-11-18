@@ -212,20 +212,28 @@
             </p>
           </div>
 
+          <!-- Cena Unificada da Capa: Barco à esquerda na onda + Tracejado passando por cima + Bússola à direita + Botão centralizado embaixo -->
           <div class="cover-scene">
-            <!-- Linha pontilhada da rota de navegação -->
-            <svg class="cover-route-svg" viewBox="0 0 540 210" fill="none" aria-hidden="true">
-              <path d="M12 185 C155 165, 290 78, 520 4" stroke="#102D4F" stroke-width="3" stroke-dasharray="8 8" stroke-linecap="round" />
+            <svg class="cover-map-svg" viewBox="0 0 1000 280" fill="none" aria-hidden="true">
+              <!-- Caminho tracejado saindo da proa do barco, passando por cima no meio e chegando na bússola à direita -->
+              <path
+                d="M 272 162 C 430 28, 640 24, 808 96"
+                stroke="#102D4F"
+                stroke-width="3.5"
+                stroke-dasharray="10 10"
+                stroke-linecap="round"
+              />
+
+              <!-- Bússola / Rosa dos Ventos à direita -->
+              <use href="#svg-compass-rose" x="815" y="28" width="140" height="140" />
+
+              <!-- Barco de Odisseu à esquerda sobre a onda -->
+              <g class="svg-ship-anim">
+                <use href="#svg-odysseus-ship" x="15" y="56" width="265" height="200" />
+              </g>
             </svg>
 
-            <!-- Rosa dos Ventos -->
-            <div class="cover-compass-wrap">
-              <svg width="100%" height="100%">
-                <use href="#svg-compass-rose"></use>
-              </svg>
-            </div>
-
-            <!-- Botão Vamos começar? -->
+            <!-- Botão Vamos começar? centralizado embaixo no meio -->
             <button type="button" class="btn-start-quiz" id="btn-start-quiz">
               <span>Vamos começar?</span>
               <span class="arrow-icon" aria-hidden="true">
@@ -234,13 +242,6 @@
                 </svg>
               </span>
             </button>
-          </div>
-
-          <!-- Navio de Odisseu em cima da onda da tela inicial -->
-          <div class="cover-ship-wrap">
-            <svg width="100%" height="100%">
-              <use href="#svg-odysseus-ship"></use>
-            </svg>
           </div>
 
           <!-- Onda na tela toda no rodapé da tela inicial -->
