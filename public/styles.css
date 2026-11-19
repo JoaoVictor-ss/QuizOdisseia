@@ -26,18 +26,22 @@
 
 html, body {
   width: 100%;
+  max-width: 100%;
   min-height: 100dvh;
   font-family: var(--font-body);
   background-color: var(--bg-parchment);
   color: var(--text-dark);
   overflow-x: hidden;
+  position: relative;
   -webkit-font-smoothing: antialiased;
 }
 
 .app-wrapper {
   position: relative;
   width: 100%;
+  max-width: 100%;
   min-height: 100dvh;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -57,6 +61,7 @@ html, body {
   background-color: var(--pill-bg);
   border: 1.5px solid var(--pill-border);
   border-radius: 999px;
+  max-width: calc(100% - 24px);
 }
 
 .music-controls {
@@ -168,6 +173,7 @@ html, body {
   border-radius: 999px;
   font-family: var(--font-display);
   white-space: nowrap;
+  max-width: calc(100% - 24px);
 }
 
 .timer-topbar.visible {
@@ -209,43 +215,42 @@ html, body {
 }
 
 /* ==========================================
-   PALCO PRINCIPAL FULL-SCREEN
+   PALCO PRINCIPAL FULL-SCREEN (100% RESPONSIVO EM QUALQUER LARGURA)
    ========================================== */
 .quiz-stage {
   width: 100%;
+  max-width: 100%;
   flex: 1;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 .slides-container {
   width: 100%;
+  max-width: 100%;
   flex: 1;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 .slide-card {
   position: relative;
   width: 100%;
+  max-width: 100%;
   min-height: 100dvh;
   background-color: var(--bg-parchment);
-  padding: 64px 28px 135px;
+  padding: 64px 24px 135px;
   display: none;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  animation: fadeSlide 0.3s ease;
 }
 
 .slide-card.active {
   display: flex;
-}
-
-@keyframes fadeSlide {
-  from { opacity: 0; }
-  to { opacity: 1; }
 }
 
 /* ==========================================
@@ -266,9 +271,11 @@ html, body {
   left: 0;
   right: 0;
   bottom: -10px;
+  width: 100%;
   height: 145px;
   z-index: 1;
   pointer-events: none;
+  overflow: hidden;
 }
 
 .waves-footer svg {
@@ -296,6 +303,7 @@ html, body {
   text-align: center;
   width: 100%;
   max-width: 780px;
+  min-width: 0;
   margin: 0 auto;
 }
 
@@ -305,6 +313,7 @@ html, body {
   flex-direction: column;
   align-items: center;
   margin-bottom: 14px;
+  max-width: 100%;
 }
 
 .title-rays-left,
@@ -322,39 +331,42 @@ html, body {
   background: var(--navy-dark);
   color: var(--white);
   font-family: var(--font-display);
-  font-size: clamp(2rem, 4.4vw, 3.2rem);
+  font-size: clamp(1.85rem, 4.4vw, 3.2rem);
   font-weight: 700;
   letter-spacing: 0.5px;
-  padding: 12px 40px 15px;
+  padding: 12px 36px 15px;
   border-radius: 24px;
   transform: rotate(-1.8deg);
   position: relative;
   z-index: 2;
   line-height: 1.05;
+  max-width: 100%;
 }
 
 .subtitle-banner {
   background: var(--blue-card);
   color: var(--navy-dark);
   font-family: var(--font-display);
-  font-size: clamp(1.2rem, 2.5vw, 1.75rem);
+  font-size: clamp(1.12rem, 2.5vw, 1.75rem);
   font-weight: 700;
-  padding: 7px 28px 9px;
+  padding: 7px 24px 9px;
   border-radius: 15px;
   transform: rotate(-1deg);
   margin-top: -8px;
   position: relative;
   z-index: 3;
+  max-width: 100%;
 }
 
 /* Painel de Criar / Entrar em Sala (100% Centralizado) */
 .entry-hub-card {
   width: 100%;
   max-width: 680px;
+  min-width: 0;
   background: var(--pill-bg);
   border: 2px solid var(--navy-dark);
   border-radius: 22px;
-  padding: 18px 22px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -364,6 +376,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
 }
 
 .entry-label {
@@ -376,6 +389,8 @@ html, body {
 
 .entry-input {
   flex: 1;
+  min-width: 0;
+  width: 100%;
   padding: 10px 16px;
   border: 2px solid var(--pill-border);
   border-radius: 12px;
@@ -394,8 +409,9 @@ html, body {
 
 .entry-actions-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+  width: 100%;
 }
 
 .entry-box {
@@ -409,6 +425,7 @@ html, body {
   justify-content: space-between;
   gap: 10px;
   text-align: center;
+  min-width: 0;
 }
 
 .entry-box-title {
@@ -432,7 +449,7 @@ html, body {
   font-family: var(--font-display);
   font-size: 1rem;
   font-weight: 700;
-  padding: 10px 22px;
+  padding: 10px 20px;
   border-radius: 999px;
   border: none;
   cursor: pointer;
@@ -441,6 +458,7 @@ html, body {
   justify-content: center;
   gap: 8px;
   transition: background 0.2s, transform 0.2s;
+  white-space: nowrap;
 }
 
 .btn-entry-primary {
@@ -461,15 +479,16 @@ html, body {
   gap: 8px;
   width: 100%;
   margin-top: auto;
+  flex-wrap: wrap;
 }
 
 .entry-code-input {
-  width: 118px;
-  padding: 9px 10px;
+  width: 112px;
+  padding: 9px 8px;
   border: 2px solid var(--navy-dark);
   border-radius: 12px;
   font-family: var(--font-mono);
-  font-size: 1.1rem;
+  font-size: 1.08rem;
   font-weight: 800;
   letter-spacing: 2px;
   text-transform: uppercase;
@@ -493,13 +512,14 @@ html, body {
   width: 100%;
   max-width: 960px;
   margin: auto auto 0;
+  overflow: hidden;
 }
 
 .cover-map-svg {
   width: 100%;
+  max-height: 210px;
   height: auto;
   display: block;
-  overflow: visible;
 }
 
 .svg-ship-anim {
@@ -520,6 +540,8 @@ html, body {
   z-index: 3;
   width: 100%;
   max-width: 780px;
+  min-width: 0;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -536,6 +558,7 @@ html, body {
   gap: 10px;
   text-align: center;
   width: 100%;
+  min-width: 0;
 }
 
 .lobby-badge-top {
@@ -547,6 +570,7 @@ html, body {
   letter-spacing: 0.8px;
   padding: 5px 16px;
   border-radius: 999px;
+  max-width: 100%;
 }
 
 .lobby-code-row {
@@ -565,6 +589,7 @@ html, body {
   padding: 7px 18px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
 }
 
@@ -632,6 +657,7 @@ html, body {
   border: 1.5px solid var(--navy-dark);
   border-radius: 999px;
   padding: 6px 16px;
+  max-width: 100%;
 }
 
 .host-switch-label {
@@ -653,6 +679,7 @@ html, body {
   position: relative;
   width: 44px;
   height: 24px;
+  flex-shrink: 0;
   display: inline-block;
 }
 
@@ -696,7 +723,7 @@ html, body {
   border-color: var(--white);
 }
 
-/* Lista de Tripulantes com Scroll fixo para não esconder o botão Iniciar */
+/* Lista de Tripulantes com Scroll fixo */
 .lobby-players-card {
   background: var(--pill-bg);
   border: 2px solid var(--pill-border);
@@ -705,12 +732,15 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: 100%;
+  min-width: 0;
 }
 
 .lobby-players-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
 }
 
 .lobby-players-header h3 {
@@ -727,11 +757,12 @@ html, body {
   font-weight: 700;
   padding: 3px 12px;
   border-radius: 999px;
+  white-space: nowrap;
 }
 
 .lobby-players-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 8px;
   max-height: 140px;
   overflow-y: auto;
@@ -763,6 +794,10 @@ html, body {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .lobby-player-chip.is-me {
@@ -782,6 +817,7 @@ html, body {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 10px;
+  width: 100%;
 }
 
 .btn-start-match {
@@ -811,11 +847,12 @@ html, body {
   padding: 10px 20px;
   border-radius: 999px;
   border: 1.5px solid var(--navy-dark);
+  text-align: center;
 }
 
 /* ==========================================
    TELAS 1 A 6: PERGUNTAS
-   (Número no meio em cima da questão, sem espaço vazio à esquerda)
+   (Número no meio em cima da questão)
    ========================================== */
 .question-layout {
   position: relative;
@@ -825,6 +862,7 @@ html, body {
   gap: 16px;
   width: 100%;
   max-width: 760px;
+  min-width: 0;
   margin: 0 auto;
 }
 
@@ -876,13 +914,12 @@ html, body {
 .question-burst {
   position: absolute;
   top: -10px;
-  right: -38px;
-  width: 34px;
-  height: 38px;
+  right: -32px;
+  width: 32px;
+  height: 36px;
   pointer-events: none;
 }
 
-/* Opções A, B, C, D alinhadas na mesma largura da pergunta */
 .options-list {
   display: flex;
   flex-direction: column;
@@ -944,6 +981,7 @@ html, body {
   line-height: 1.28;
   color: var(--text-dark);
   flex: 1;
+  min-width: 0;
 }
 
 .option-check {
@@ -967,7 +1005,6 @@ html, body {
   transform: scale(1);
 }
 
-/* Rodapé de Navegação das Perguntas */
 .question-nav-footer {
   position: relative;
   z-index: 4;
@@ -1023,7 +1060,7 @@ html, body {
 }
 
 /* ==========================================
-   TELA 7: RANKING + LEMBRETE + GABARITO
+   TELA 7: RANKING + LEMBRETE + GABARITO (100% CONTIDO E CENTRALIZADO)
    ========================================== */
 .slide-card[data-slide="7"] {
   padding-top: 24px;
@@ -1038,7 +1075,8 @@ html, body {
   flex-direction: column;
   align-items: center;
   width: 100%;
-  max-width: 940px;
+  max-width: 860px;
+  min-width: 0;
   margin: 0 auto;
 }
 
@@ -1076,16 +1114,19 @@ html, body {
 
 .final-compass-wrap {
   position: absolute;
-  right: -10px;
+  right: 0;
   top: 0;
-  width: clamp(80px, 9vw, 110px);
-  height: clamp(80px, 9vw, 110px);
+  width: clamp(76px, 8vw, 105px);
+  height: clamp(76px, 8vw, 105px);
   z-index: 2;
   pointer-events: none;
 }
 
 .final-main-body {
   width: 100%;
+  max-width: 820px;
+  min-width: 0;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1097,16 +1138,17 @@ html, body {
   z-index: 2;
   background: var(--blue-card);
   border-radius: 24px;
-  padding: 18px 34px;
+  padding: 18px 30px;
   width: 100%;
   max-width: 720px;
+  min-width: 0;
   margin: 0 auto;
   text-align: center;
 }
 
 .final-message-text {
   font-family: var(--font-body);
-  font-size: clamp(1rem, 1.8vw, 1.25rem);
+  font-size: clamp(0.98rem, 1.8vw, 1.22rem);
   font-weight: 800;
   font-style: italic;
   color: var(--navy-dark);
@@ -1115,10 +1157,10 @@ html, body {
 
 .final-laurel-wrap {
   position: absolute;
-  right: -28px;
-  bottom: -12px;
-  width: 56px;
-  height: 78px;
+  right: -18px;
+  bottom: -10px;
+  width: 52px;
+  height: 74px;
   z-index: 4;
   pointer-events: none;
 }
@@ -1126,26 +1168,28 @@ html, body {
 /* Pílulas de Desempenho Individual */
 .my-score-summary {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   width: 100%;
   max-width: 820px;
+  min-width: 0;
 }
 
 .score-pill {
   background: var(--pill-bg);
   border: 2px solid var(--navy-dark);
   border-radius: 16px;
-  padding: 10px 14px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   gap: 4px;
+  min-width: 0;
 }
 
 .score-pill-label {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 800;
   text-transform: uppercase;
   color: var(--navy-mid);
@@ -1153,7 +1197,7 @@ html, body {
 
 .score-pill-value {
   font-family: var(--font-mono);
-  font-size: 1.18rem;
+  font-size: clamp(1rem, 1.6vw, 1.18rem);
   font-weight: 800;
   color: var(--navy-dark);
   font-variant-numeric: tabular-nums;
@@ -1163,10 +1207,11 @@ html, body {
 .ranking-card {
   width: 100%;
   max-width: 820px;
+  min-width: 0;
   background: var(--pill-bg);
   border: 2px solid var(--navy-dark);
   border-radius: 20px;
-  padding: 16px 20px;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1182,7 +1227,7 @@ html, body {
 
 .ranking-header h3 {
   font-family: var(--font-display);
-  font-size: 1.18rem;
+  font-size: 1.15rem;
   color: var(--navy-dark);
 }
 
@@ -1223,8 +1268,10 @@ html, body {
 
 .ranking-table-wrap {
   width: 100%;
-  max-height: 230px;
+  max-width: 100%;
+  max-height: 220px;
   overflow-y: auto;
+  overflow-x: auto;
   border-radius: 12px;
   border: 1.5px solid var(--pill-border);
 }
@@ -1233,7 +1280,7 @@ html, body {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
 }
 
 .ranking-table th {
@@ -1241,14 +1288,14 @@ html, body {
   color: var(--white);
   font-family: var(--font-display);
   font-weight: 600;
-  padding: 9px 14px;
+  padding: 9px 12px;
   position: sticky;
   top: 0;
   z-index: 2;
 }
 
 .ranking-table td {
-  padding: 9px 14px;
+  padding: 9px 12px;
   border-bottom: 1px solid rgba(16, 45, 79, 0.12);
   font-weight: 800;
   color: var(--navy-dark);
@@ -1257,7 +1304,7 @@ html, body {
 
 .ranking-table td.col-time {
   font-family: var(--font-mono);
-  font-size: 0.86rem;
+  font-size: 0.84rem;
 }
 
 .ranking-table tr:nth-child(even) td {
@@ -1272,10 +1319,10 @@ html, body {
 .me-tag {
   background: var(--navy-dark);
   color: var(--white);
-  font-size: 0.72rem;
-  padding: 2px 8px;
+  font-size: 0.7rem;
+  padding: 2px 7px;
   border-radius: 999px;
-  margin-left: 6px;
+  margin-left: 5px;
 }
 
 /* Navio na Tela Final */
@@ -1283,9 +1330,9 @@ html, body {
   position: absolute;
   left: 2%;
   bottom: 72px;
-  width: clamp(160px, 16vw, 220px);
-  height: clamp(120px, 12vw, 166px);
-  z-index: 3;
+  width: clamp(150px, 15vw, 210px);
+  height: clamp(114px, 11.5vw, 160px);
+  z-index: 2;
   animation: shipOnWave 3.4s ease-in-out infinite;
   pointer-events: none;
 }
@@ -1296,6 +1343,7 @@ html, body {
   z-index: 4;
   width: 100%;
   max-width: 820px;
+  min-width: 0;
 }
 
 .final-choices-title {
@@ -1309,8 +1357,9 @@ html, body {
 
 .final-choices-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+  width: 100%;
 }
 
 .choice-item {
@@ -1322,6 +1371,8 @@ html, body {
   flex-direction: column;
   justify-content: space-between;
   gap: 6px;
+  min-width: 0;
+  word-break: break-word;
 }
 
 .choice-item.is-correct {
@@ -1408,6 +1459,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 6px;
 }
@@ -1431,24 +1483,23 @@ html, body {
   background: var(--bg-parchment);
   border: 2.5px solid var(--navy-dark);
   border-radius: 24px;
-  padding: 24px 28px;
+  padding: 24px 24px;
   width: 100%;
   max-width: 440px;
   text-align: center;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  animation: fadeSlide 0.2s ease;
 }
 
 .confirm-modal-title {
   font-family: var(--font-display);
-  font-size: 1.4rem;
+  font-size: 1.35rem;
   color: var(--navy-dark);
 }
 
 .confirm-modal-text {
-  font-size: 1.02rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-body);
   line-height: 1.4;
@@ -1458,19 +1509,31 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-top: 6px;
 }
 
 /* ==========================================
-   RESPONSIVIDADE: TABLETS (ATÉ 1024px)
+   RESPONSIVIDADE: TELAS ATÉ 1180px
    ========================================== */
-@media (max-width: 1024px) {
+@media (max-width: 1180px) {
+  .final-ship-wrap {
+    display: none;
+  }
+}
+
+@media (max-width: 960px) {
   .final-choices-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .final-ship-wrap {
+  .title-rays-left,
+  .title-rays-right,
+  .final-rays-left,
+  .final-rays-right,
+  .question-burst,
+  .final-compass-wrap {
     display: none;
   }
 }
@@ -1496,26 +1559,22 @@ html, body {
     gap: 10px;
     padding: 7px 14px;
     border-radius: 999px;
-    width: calc(100% - 28px);
+    width: calc(100% - 24px);
   }
 
   .slide-card {
     min-height: calc(100dvh - 54px);
-    padding: 16px 14px 98px;
+    padding: 16px 12px 96px;
   }
 
-  .slide-card[data-slide="lobby"] {
+  .slide-card[data-slide="lobby"],
+  .slide-card[data-slide="7"] {
     padding-top: 12px;
     padding-bottom: 92px;
     justify-content: flex-start;
   }
 
-  .title-rays-left,
-  .title-rays-right,
-  .final-rays-left,
-  .final-rays-right,
-  .question-burst,
-  .final-compass-wrap {
+  .final-laurel-wrap {
     display: none;
   }
 
@@ -1532,7 +1591,7 @@ html, body {
   }
 
   .entry-actions-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .join-code-row {
@@ -1540,7 +1599,7 @@ html, body {
   }
 
   .lobby-header-card {
-    padding: 14px 14px;
+    padding: 14px 12px;
     gap: 8px;
   }
 
@@ -1550,7 +1609,7 @@ html, body {
 
   .lobby-players-grid {
     max-height: 112px;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .lobby-footer-actions {
@@ -1573,8 +1632,8 @@ html, body {
   }
 
   .question-box {
-    padding: 28px 16px 16px;
-    font-size: 1.02rem;
+    padding: 28px 14px 16px;
+    font-size: 1rem;
   }
 
   .question-nav-footer {
@@ -1583,22 +1642,30 @@ html, body {
 
   .question-nav-footer .btn-nav {
     flex: 1;
-    padding: 10px 12px;
-    font-size: 0.94rem;
+    padding: 10px 10px;
+    font-size: 0.92rem;
   }
 
   .my-score-summary,
   .final-choices-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ranking-card {
+    padding: 12px 10px;
   }
 
   .ranking-table th,
   .ranking-table td {
-    padding: 8px 8px;
-    font-size: 0.82rem;
+    padding: 7px 6px;
+    font-size: 0.78rem;
+  }
+
+  .ranking-table td.col-time {
+    font-size: 0.74rem;
   }
 
   .waves-footer {
-    height: 78px;
+    height: 76px;
   }
 }

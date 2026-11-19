@@ -582,7 +582,16 @@ function renderQuestionSlides() {
   questionsMount.replaceWith(fragment);
 }
 
+function resetHorizontalOffset() {
+  if (window.scrollX !== 0) {
+    window.scrollTo(0, window.scrollY);
+  }
+  document.documentElement.scrollLeft = 0;
+  document.body.scrollLeft = 0;
+}
+
 function showSlide(slideId) {
+  const changed = currentSlide !== String(slideId);
   currentSlide = String(slideId);
 
   const isQuestionSlide = ["1", "2", "3", "4", "5", "6"].includes(currentSlide);
@@ -593,6 +602,10 @@ function showSlide(slideId) {
     card.classList.toggle("active", card.dataset.slide === currentSlide);
   });
 
+  if (changed) {
+    window.scrollTo(0, 0);
+  }
+  resetHorizontalOffset();
   saveSessionState();
 }
 
@@ -1552,17 +1565,25 @@ function initQuiz() {
   // Restaura imediatamente a sessão (respostas, tempo e ranking) se a pessoa saiu e voltou da tela/aba
   restorePreviousSessionIfApplicable();
 
+  window.addEventListener("resize", () => {
+    resetHorizontalOffset();
+  });
+
   // Quando o usuário sai da aba/aplicativo (no celular ou PC) e volta para a tela:
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && roomCode) {
-      if (currentSlide === "7") {
-        renderFinalRankingAndChoices(currentRoomData);
+    if (document.visibilityState === "visible") {
+      resetHorizontalOffset();
+      if (roomCode) {
+        if (currentSlide === "7") {
+          renderFinalRankingAndChoices(currentRoomData);
+        }
+        syncAndRehydrateWithServer();
       }
-      syncAndRehydrateWithServer();
     }
   });
 
   window.addEventListener("focus", () => {
+    resetHorizontalOffset();
     if (roomCode) {
       if (currentSlide === "7") {
         renderFinalRankingAndChoices(currentRoomData);
