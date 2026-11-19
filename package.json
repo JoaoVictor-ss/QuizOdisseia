@@ -1,0 +1,12 @@
+{
+  "name": "quiz-odisseia-multiplayer",
+  "version": "1.0.0",
+  "description": "Quiz Multiplayer em Tempo Real - Jornada Odisseia: sobrevivendo às mudanças",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

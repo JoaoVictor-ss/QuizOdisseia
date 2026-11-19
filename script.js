@@ -1,74 +1,107 @@
 const QUIZ_QUESTIONS = [
   {
     number: 1,
-    question: "Quando uma mudança acontece no trabalho, o que você considera mais importante?",
+    question:
+      "Uma empresa anuncia que substituirá seu sistema de atendimento por uma nova plataforma. Qual deve ser o primeiro passo para reconhecer essa mudança?",
     options: [
-      { letter: "A", text: "Saber o que está mudando." },
-      { letter: "B", text: "Entender como isso afetará minha rotina." },
-      { letter: "C", text: "Receber orientações sobre o processo." },
-      { letter: "D", text: "Ter apoio da minha liderança." }
-    ]
+      { letter: "A", text: "Manter as atividades sem considerar o anúncio." },
+      { letter: "B", text: "Começar a utilizar a nova plataforma imediatamente." },
+      { letter: "C", text: "Identificar o que será alterado e quais áreas serão afetadas." },
+      { letter: "D", text: "Cobrar que todos apresentem resultados no novo sistema." }
+    ],
+    correct: "C"
   },
   {
     number: 2,
-    question: "O que pode ajudar um colaborador a se sentir mais seguro durante uma mudança?",
+    question:
+      "Ao perceber que uma mudança está sendo implementada, um colaborador demonstra insegurança e faz perguntas. Como a organização deve interpretar essa reação?",
     options: [
-      { letter: "A", text: "Uma comunicação clara." },
-      { letter: "B", text: "Treinamento adequado." },
-      { letter: "C", text: "Acompanhamento da equipe." },
-      { letter: "D", text: "Reconhecimento pelo esforço." }
-    ]
+      { letter: "A", text: "Como uma situação que deve ser resolvida somente pelo próprio colaborador." },
+      { letter: "B", text: "Como um sinal de que existem dúvidas e impactos que precisam ser identificados." },
+      { letter: "C", text: "Como falta de comprometimento com a empresa." },
+      { letter: "D", text: "Como uma resistência que deve ser punida." }
+    ],
+    correct: "B"
   },
   {
     number: 3,
-    question: "Qual atitude facilita mais a adaptação a uma nova forma de trabalhar?",
+    question:
+      "Após anunciar a implantação de um novo sistema, a empresa percebe que os funcionários não sabem por que ele será utilizado. O que deve fazer?",
     options: [
-      { letter: "A", text: "Resistir à mudança." },
-      { letter: "B", text: "Buscar aprender e se adaptar." },
-      { letter: "C", text: "Esperar para ver como será." },
-      { letter: "D", text: "Comparar com o modelo antigo." }
-    ]
+      { letter: "A", text: "Explicar os motivos, os objetivos e os impactos da implantação." },
+      { letter: "B", text: "Exigir que todos aprendam o sistema por conta própria." },
+      { letter: "C", text: "Repetir apenas a data em que o sistema começará a funcionar." },
+      { letter: "D", text: "Esperar que os funcionários descubram os benefícios durante o uso." }
+    ],
+    correct: "A"
   },
   {
     number: 4,
-    question: "Após uma mudança ser implementada, o que é mais importante fazer?",
+    question:
+      "Uma equipe recebeu informações sobre uma mudança, mas ainda não consegue visualizar como ela será aplicada no trabalho diário. O que a organização deve fazer?",
     options: [
-      { letter: "A", text: "Avaliar as dificuldades." },
-      { letter: "B", text: "Celebrar as conquistas." },
-      { letter: "C", text: "Buscar mais informações." },
-      { letter: "D", text: "Continuar com o antigo processo." }
-    ]
+      { letter: "A", text: "Apresentar somente os resultados esperados pela direção." },
+      { letter: "B", text: "Deixar que cada funcionário descubra sozinho como agir." },
+      { letter: "C", text: "Exigir que todos sigam as novas orientações sem questionamentos." },
+      { letter: "D", text: "Demonstrar como as novas atividades serão realizadas e esclarecer dúvidas." }
+    ],
+    correct: "D"
   },
   {
     number: 5,
-    question: "Qual papel do RH é mais relevante durante uma mudança organizacional?",
+    question:
+      "Uma empresa implantou um novo procedimento, mas parte da equipe ainda apresenta dificuldades para executá-lo. Qual é a melhor iniciativa?",
     options: [
-      { letter: "A", text: "Informar apenas sobre a mudança." },
-      { letter: "B", text: "Oferecer suporte e orientação." },
-      { letter: "C", text: "Cobrar resultados rápidos." },
-      { letter: "D", text: "Ignorar as dificuldades." }
-    ]
+      { letter: "A", text: "Cobrar produtividade igual à anterior desde o primeiro dia." },
+      { letter: "B", text: "Oferecer treinamento, orientação e acompanhamento durante a aplicação." },
+      { letter: "C", text: "Substituir os funcionários que apresentarem dúvidas." },
+      { letter: "D", text: "Permitir que cada funcionário continue usando o procedimento antigo." }
+    ],
+    correct: "B"
   },
   {
     number: 6,
-    question: "Qual frase melhor representa o impacto de uma mudança bem conduzida?",
+    question:
+      "Depois de algumas semanas utilizando o novo sistema, os colaboradores apresentam sugestões e relatam dificuldades que ainda persistem. O que o RH deve fazer?",
     options: [
-      { letter: "A", text: "Gera insegurança e desmotivação." },
-      { letter: "B", text: "Traz aprendizado, crescimento e novas oportunidades." },
-      { letter: "C", text: "Aumenta a pressão no trabalho." },
-      { letter: "D", text: "Cria ainda mais processos." }
-    ]
+      { letter: "A", text: "Desconsiderar as sugestões para evitar novas alterações." },
+      { letter: "B", text: "Retomar obrigatoriamente o sistema antigo." },
+      { letter: "C", text: "Encerrar o acompanhamento porque a implantação já aconteceu." },
+      { letter: "D", text: "Ouvir a equipe, avaliar os resultados e ajustar o que for necessário." }
+    ],
+    correct: "D"
   }
 ];
 
-let currentSlide = 0; // 0 = Capa, 1..6 = Perguntas, 7 = Mensagem Final + Escolhas
-const userAnswers = {};
+const MAX_TIME_MS = 3 * 60 * 1000; // 3 minutos = 180.000 ms
 
+// Estado da Sessão e Sala Multiplayer
+let currentSlide = "0"; // '0' | 'lobby' | '1'..'6' | '7'
+const userAnswers = {};
+let roomCode = null;
+let playerId = null;
+let playerName = "";
+let isHost = false;
+let currentRoomData = null;
+let eventSource = null;
+
+// Cronômetro de alta precisão (Minuto, Segundo e Milésimo)
+let matchStartPerf = null;
+let timerRafId = null;
+let hasSubmitted = false;
+let finalElapsedMs = 0;
+
+// Elementos DOM
 const slidesContainer = document.getElementById("slides-container");
 const questionsMount = document.getElementById("questions-mount");
 const finalChoicesGrid = document.getElementById("final-choices-grid");
+const timerTopbar = document.getElementById("timer-topbar");
+const timerRoomCode = document.getElementById("timer-room-code");
+const timerClockBox = document.getElementById("timer-clock-box");
+const timerRemainingEl = document.getElementById("timer-remaining");
+const timerElapsedEl = document.getElementById("timer-elapsed");
 
-// Elementos de Áudio (Música solicitada + Ambiência de Mar/Barco)
+// Elementos de Áudio
 const bgMusic = document.getElementById("bg-music");
 const seaAmbience = document.getElementById("sea-ambience");
 const btnMusicToggle = document.getElementById("btn-music-toggle");
@@ -85,8 +118,37 @@ let isMuted = false;
 let previousVolume = 0.65;
 
 /**
- * Gera o som realista das ondas do mar e do barco velejando na água
- * para tocar em conjunto com a música de fundo escolhida.
+ * Formata milissegundos em "MMm SSs MMMms" (Minuto, Segundo e Milésimo)
+ */
+function formatMinSecMs(ms) {
+  const clamped = Math.max(0, Math.round(ms));
+  const minutes = Math.floor(clamped / 60000);
+  const seconds = Math.floor((clamped % 60000) / 1000);
+  const millis = clamped % 1000;
+
+  const mStr = String(minutes).padStart(2, "0");
+  const sStr = String(seconds).padStart(2, "0");
+  const msStr = String(millis).padStart(3, "0");
+  return `${mStr}m ${sStr}s ${msStr}ms`;
+}
+
+/**
+ * Formata milissegundos para o relógio regressivo "MM:SS.mmm"
+ */
+function formatCountdownClock(ms) {
+  const clamped = Math.max(0, Math.round(ms));
+  const minutes = Math.floor(clamped / 60000);
+  const seconds = Math.floor((clamped % 60000) / 1000);
+  const millis = clamped % 1000;
+
+  const mStr = String(minutes).padStart(2, "0");
+  const sStr = String(seconds).padStart(2, "0");
+  const msStr = String(millis).padStart(3, "0");
+  return `${mStr}:${sStr}.${msStr}`;
+}
+
+/**
+ * Gera som realista das ondas do mar e do barco velejando
  */
 function createSeaWavesAmbienceUrl() {
   const sampleRate = 22050;
@@ -97,14 +159,12 @@ function createSeaWavesAmbienceUrl() {
 
   let b0L = 0, b1L = 0, b2L = 0, b3L = 0, b4L = 0, b5L = 0, b6L = 0;
   let b0R = 0, b1R = 0, b2R = 0, b3R = 0, b4R = 0, b5R = 0, b6R = 0;
-
   let waveLpL = 0, waveLpR = 0;
   let hullLpL = 0, hullLpR = 0;
   let hullHpL = 0, hullHpR = 0;
 
   for (let i = 0; i < numSamples; i++) {
     const t = i / sampleRate;
-
     const whiteL = Math.random() * 2 - 1;
     const whiteR = Math.random() * 2 - 1;
 
@@ -128,7 +188,6 @@ function createSeaWavesAmbienceUrl() {
 
     const wavePhase1 = (2 * Math.PI * t) / 8.0;
     const waveShape1 = 0.5 + 0.5 * Math.sin(wavePhase1 - 0.35 * Math.cos(wavePhase1));
-
     const wavePhase2 = (2 * Math.PI * t) / 8.0 + 1.5;
     const waveShape2 = 0.5 + 0.5 * Math.sin(wavePhase2 - 0.3 * Math.cos(wavePhase2));
 
@@ -149,7 +208,6 @@ function createSeaWavesAmbienceUrl() {
     const oceanL = (waveLpL * ampWaveL + sprayL) * 0.65;
     const oceanR = (waveLpR * ampWaveR + sprayR) * 0.65;
 
-    // Marola batendo no casco do barco velejando
     const hullPhase = (2 * Math.PI * t) / 1.6;
     const hullSplashEnv = Math.pow(0.5 + 0.5 * Math.sin(hullPhase + 0.4 * Math.sin(hullPhase)), 3.2);
     const hullAlphaLp = Math.min(0.9, (2 * Math.PI * 1350) / sampleRate);
@@ -220,15 +278,12 @@ function applyVolumes() {
   const effective = isMuted ? 0 : masterVolume;
   bgMusic.volume = effective;
   bgMusic.muted = isMuted;
-
-  // O som suave do mar acompanha proporcionalmente o volume da música
   seaAmbience.volume = Math.min(1, effective * 0.45);
   seaAmbience.muted = isMuted;
 }
 
 function updateMusicUI() {
   const isPlaying = !bgMusic.paused && !bgMusic.ended;
-
   btnMusicToggle.classList.toggle("playing", isPlaying);
 
   if (isPlaying) {
@@ -259,7 +314,6 @@ function tryAutoPlay() {
     updateMusicUI();
     return;
   }
-
   seaAmbience.play().catch(() => {});
   bgMusic
     .play()
@@ -284,8 +338,6 @@ function initMusicPlayer() {
   seaAmbience.src = createSeaWavesAmbienceUrl();
   applyVolumes();
   updateMusicUI();
-
-  // Toca imediatamente ao abrir o site
   tryAutoPlay();
 
   UNLOCK_EVENTS.forEach((evt) => {
@@ -340,6 +392,9 @@ function initMusicPlayer() {
   bgMusic.addEventListener("pause", updateMusicUI);
 }
 
+// ==========================================
+// RENDERIZAÇÃO DOS SLIDES DE PERGUNTAS (1 A 6)
+// ==========================================
 function renderQuestionSlides() {
   const fragment = document.createDocumentFragment();
 
@@ -386,15 +441,25 @@ function renderQuestionSlides() {
         </div>
 
         <div class="question-nav-footer">
-          <button type="button" class="btn-nav" data-action="prev" data-from="${q.number}">
-            <span>←</span>
-            <span>Voltar</span>
-          </button>
+          ${
+            q.number > 1
+              ? `<button type="button" class="btn-nav" data-action="prev" data-from="${q.number}">
+                  <span>←</span>
+                  <span>Questão Anterior</span>
+                </button>`
+              : `<span></span>`
+          }
 
-          <button type="button" class="btn-nav btn-nav-primary" data-action="next" data-from="${q.number}">
-            <span>${isLastQuestion ? "Concluir Jornada" : "Próxima"}</span>
-            <span>→</span>
-          </button>
+          ${
+            isLastQuestion
+              ? `<button type="button" class="btn-nav btn-finish-match" data-action="finish" data-from="${q.number}">
+                  <span>🏁 Finalizar e Enviar Respostas</span>
+                </button>`
+              : `<button type="button" class="btn-nav btn-nav-primary" data-action="next" data-from="${q.number}">
+                  <span>Próxima Questão</span>
+                  <span>→</span>
+                </button>`
+          }
         </div>
       </div>
 
@@ -409,46 +474,20 @@ function renderQuestionSlides() {
   questionsMount.replaceWith(fragment);
 }
 
-function renderFinalChoices() {
-  if (!finalChoicesGrid) return;
+function showSlide(slideId) {
+  currentSlide = String(slideId);
 
-  finalChoicesGrid.innerHTML = QUIZ_QUESTIONS.map((q) => {
-    const chosenLetter = userAnswers[q.number];
-    const chosenOpt = q.options.find((o) => o.letter === chosenLetter);
-
-    const answerHtml = chosenOpt
-      ? `<span class="choice-a-letter">${chosenOpt.letter}</span><span>${chosenOpt.text}</span>`
-      : `<span><em>Não respondida</em></span>`;
-
-    return `
-      <div class="choice-item">
-        <div class="choice-q">
-          <span class="choice-q-num">${q.number}</span>
-          <span>${q.question}</span>
-        </div>
-        <div class="choice-a">
-          ${answerHtml}
-        </div>
-      </div>
-    `;
-  }).join("");
-}
-
-function goToSlide(slideIndex) {
-  currentSlide = Math.max(0, Math.min(7, slideIndex));
-
-  if (currentSlide === 7) {
-    renderFinalChoices();
-  }
+  const isQuestionSlide = ["1", "2", "3", "4", "5", "6"].includes(currentSlide);
+  timerTopbar.classList.toggle("visible", isQuestionSlide);
 
   const allSlides = slidesContainer.querySelectorAll(".slide-card");
   allSlides.forEach((card) => {
-    const cardIndex = Number(card.dataset.slide);
-    card.classList.toggle("active", cardIndex === currentSlide);
+    card.classList.toggle("active", card.dataset.slide === currentSlide);
   });
 }
 
 function selectOption(questionNum, letter) {
+  if (hasSubmitted) return;
   userAnswers[questionNum] = letter;
 
   const slideEl = slidesContainer.querySelector(`.slide-card[data-slide="${questionNum}"]`);
@@ -462,27 +501,440 @@ function selectOption(questionNum, letter) {
   }
 }
 
-function restartQuiz() {
-  Object.keys(userAnswers).forEach((k) => delete userAnswers[k]);
+// ==========================================
+// CRONÔMETRO DE 3 MINUTOS COM PRECISÃO DE MILÉSIMOS
+// ==========================================
+function startLocalMatchTimer() {
+  stopLocalMatchTimer();
+  hasSubmitted = false;
+  matchStartPerf = performance.now();
+  timerRoomCode.textContent = roomCode || "-----";
 
-  slidesContainer.querySelectorAll(".option-btn").forEach((btn) => {
-    btn.classList.remove("selected");
-    btn.setAttribute("aria-pressed", "false");
-  });
+  function tick() {
+    if (hasSubmitted) return;
+    const elapsed = Math.max(0, performance.now() - matchStartPerf);
+    const remaining = Math.max(0, MAX_TIME_MS - elapsed);
 
-  goToSlide(0);
+    timerRemainingEl.textContent = formatCountdownClock(remaining);
+    timerElapsedEl.textContent = formatMinSecMs(elapsed);
+    timerClockBox.classList.toggle("urgent", remaining <= 30000);
+
+    if (remaining <= 0) {
+      // Tempo de 3 minutos esgotado -> envia respostas automaticamente
+      submitMatchAnswers(MAX_TIME_MS);
+      return;
+    }
+
+    timerRafId = requestAnimationFrame(tick);
+  }
+
+  timerRafId = requestAnimationFrame(tick);
 }
 
-function initQuiz() {
-  renderQuestionSlides();
-  renderFinalChoices();
-  initMusicPlayer();
+function stopLocalMatchTimer() {
+  if (timerRafId) {
+    cancelAnimationFrame(timerRafId);
+    timerRafId = null;
+  }
+}
 
-  document.getElementById("btn-start-quiz").addEventListener("click", () => {
-    tryAutoPlay();
-    goToSlide(1);
+// ==========================================
+// COMUNICAÇÃO EM TEMPO REAL COM O SERVIDOR (SSE + REST)
+// ==========================================
+function getShareableRoomLink(code) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("sala", code);
+  return url.toString();
+}
+
+function connectRoomEvents(code) {
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+
+  eventSource = new EventSource(`/api/rooms/${code}/events`);
+  eventSource.onmessage = (evt) => {
+    try {
+      const data = JSON.parse(evt.data);
+      if (data.type === "room_update" && data.room) {
+        handleRoomStateUpdate(data.room);
+      }
+    } catch {
+      // Ignora pacotes inválidos
+    }
+  };
+}
+
+function handleRoomStateUpdate(room) {
+  const prevStatus = currentRoomData ? currentRoomData.status : null;
+  currentRoomData = room;
+  isHost = room.hostId === playerId;
+
+  // Atualiza Lobby
+  updateLobbyUI(room);
+
+  // Se a sala acabou de mudar de 'lobby' para 'playing', inicia a partida para todos!
+  if (room.status === "playing" && (currentSlide === "lobby" || prevStatus === "lobby")) {
+    Object.keys(userAnswers).forEach((k) => delete userAnswers[k]);
+    slidesContainer.querySelectorAll(".option-btn").forEach((btn) => {
+      btn.classList.remove("selected");
+      btn.setAttribute("aria-pressed", "false");
+    });
+
+    startLocalMatchTimer();
+    showSlide("1");
+  }
+
+  // Se o criador reiniciou a sala de volta para o Lobby
+  if (room.status === "lobby" && currentSlide === "7") {
+    stopLocalMatchTimer();
+    showSlide("lobby");
+  }
+
+  // Se o jogador já está na tela final (7), atualiza o Ranking Ao Vivo
+  if (currentSlide === "7") {
+    renderFinalRankingAndChoices(room);
+  }
+}
+
+function updateLobbyUI(room) {
+  document.getElementById("lobby-room-code").textContent = room.code;
+  document.getElementById("lobby-players-count").textContent = `${room.playersCount} / ${room.maxPlayers}`;
+  document.getElementById("lobby-share-url-preview").textContent = `Link de convite: ${getShareableRoomLink(room.code)}`;
+
+  const grid = document.getElementById("lobby-players-grid");
+  grid.innerHTML = room.players
+    .map((p) => {
+      const isMe = p.id === playerId;
+      const crown = p.isHost ? "👑 " : "⚓ ";
+      const meLabel = isMe ? " (Você)" : "";
+      return `
+        <div class="lobby-player-chip ${isMe ? "is-me" : ""}">
+          <span>${crown}${escapeHtml(p.name)}${meLabel}</span>
+        </div>
+      `;
+    })
+    .join("");
+
+  const hostControls = document.getElementById("lobby-host-controls");
+  const guestWaiting = document.getElementById("lobby-guest-waiting");
+  if (isHost) {
+    hostControls.style.display = "block";
+    guestWaiting.style.display = "none";
+  } else {
+    hostControls.style.display = "none";
+    guestWaiting.style.display = "block";
+  }
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+async function createRoom() {
+  const nameInput = document.getElementById("input-player-name");
+  const errorEl = document.getElementById("entry-error-msg");
+  const name = nameInput.value.trim();
+
+  if (!name) {
+    errorEl.textContent = "Por favor, digite seu nome antes de criar a sala.";
+    nameInput.focus();
+    return;
+  }
+
+  errorEl.textContent = "";
+  try {
+    const res = await fetch("/api/rooms/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerName: name })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      errorEl.textContent = data.error || "Não foi possível criar a sala.";
+      return;
+    }
+
+    roomCode = data.code;
+    playerId = data.playerId;
+    playerName = name;
+    isHost = true;
+
+    // Atualiza URL sem recarregar para facilitar compartilhamento
+    window.history.replaceState({}, "", `?sala=${roomCode}`);
+
+    handleRoomStateUpdate(data.room);
+    connectRoomEvents(roomCode);
+    showSlide("lobby");
+  } catch {
+    errorEl.textContent = "Erro de conexão com o servidor.";
+  }
+}
+
+async function joinRoom() {
+  const nameInput = document.getElementById("input-player-name");
+  const codeInput = document.getElementById("input-room-code");
+  const errorEl = document.getElementById("entry-error-msg");
+
+  const name = nameInput.value.trim();
+  const code = codeInput.value.trim().toUpperCase();
+
+  if (!name) {
+    errorEl.textContent = "Por favor, digite seu nome para entrar na sala.";
+    nameInput.focus();
+    return;
+  }
+  if (!code || code.length !== 5) {
+    errorEl.textContent = "Digite o código de 5 dígitos da sala.";
+    codeInput.focus();
+    return;
+  }
+
+  errorEl.textContent = "";
+  try {
+    const res = await fetch("/api/rooms/join", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, playerName: name, playerId })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      errorEl.textContent = data.error || "Não foi possível entrar na sala.";
+      return;
+    }
+
+    roomCode = data.code;
+    playerId = data.playerId;
+    playerName = name;
+
+    window.history.replaceState({}, "", `?sala=${roomCode}`);
+
+    handleRoomStateUpdate(data.room);
+    connectRoomEvents(roomCode);
+
+    if (data.room.status === "playing") {
+      startLocalMatchTimer();
+      showSlide("1");
+    } else {
+      showSlide("lobby");
+    }
+  } catch {
+    errorEl.textContent = "Erro de conexão com o servidor.";
+  }
+}
+
+async function startMatchAsHost() {
+  if (!roomCode || !playerId) return;
+  try {
+    await fetch("/api/rooms/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: roomCode, playerId })
+    });
+  } catch {
+    // Tratado via SSE
+  }
+}
+
+async function submitMatchAnswers(forcedElapsedMs) {
+  if (hasSubmitted) return;
+  hasSubmitted = true;
+
+  const measuredElapsed =
+    typeof forcedElapsedMs === "number"
+      ? forcedElapsedMs
+      : matchStartPerf
+      ? Math.min(MAX_TIME_MS, Math.max(100, Math.round(performance.now() - matchStartPerf)))
+      : MAX_TIME_MS;
+
+  finalElapsedMs = measuredElapsed;
+  stopLocalMatchTimer();
+
+  try {
+    const res = await fetch("/api/rooms/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: roomCode,
+        playerId,
+        answers: userAnswers,
+        elapsedMs: finalElapsedMs
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.room) {
+      currentRoomData = data.room;
+    }
+  } catch {
+    // Se houver oscilação, ainda mostra o resultado local
+  }
+
+  renderFinalRankingAndChoices(currentRoomData);
+  showSlide("7");
+}
+
+function renderFinalRankingAndChoices(room) {
+  // 1. Calcula pontuação local como garantia imediata
+  let localScore = 0;
+  QUIZ_QUESTIONS.forEach((q) => {
+    if (userAnswers[q.number] === q.correct) {
+      localScore++;
+    }
   });
 
+  document.getElementById("ranking-room-code").textContent = roomCode || "-----";
+
+  // 2. Atualiza Ranking da Sala
+  const tbody = document.getElementById("ranking-tbody");
+  if (room && Array.isArray(room.ranking)) {
+    const finishedCount = room.ranking.filter((p) => p.finished).length;
+    document.getElementById("ranking-progress-text").textContent =
+      `${finishedCount} de ${room.playersCount} finalizaram`;
+
+    const myIndex = room.ranking.findIndex((p) => p.id === playerId);
+    const myPlayer = room.ranking[myIndex];
+
+    document.getElementById("my-rank-pos").textContent =
+      myIndex >= 0 ? `#${myIndex + 1}º` : "#1º";
+    document.getElementById("my-score-count").textContent =
+      `${myPlayer && myPlayer.finished ? myPlayer.score : localScore} / 6`;
+    document.getElementById("my-time-formatted").textContent =
+      formatMinSecMs(myPlayer && myPlayer.elapsedMs ? myPlayer.elapsedMs : finalElapsedMs);
+
+    tbody.innerHTML = room.ranking
+      .map((p, idx) => {
+        const pos = idx + 1;
+        const medal = pos === 1 ? "🥇 1º" : pos === 2 ? "🥈 2º" : pos === 3 ? "🥉 3º" : `${pos}º`;
+        const isMe = p.id === playerId;
+        const meBadge = isMe ? `<span class="me-tag">Você</span>` : "";
+        const scoreText = p.finished ? `${p.score} / 6` : "—";
+        const timeText = p.finished ? formatMinSecMs(p.elapsedMs) : "⏳ Respondendo...";
+
+        return `
+          <tr class="${isMe ? "is-me-row" : ""}">
+            <td>${medal}</td>
+            <td>${escapeHtml(p.name)}${meBadge}</td>
+            <td>${scoreText}</td>
+            <td>${timeText}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const btnBackLobby = document.getElementById("btn-back-lobby");
+    btnBackLobby.style.display = isHost ? "inline-flex" : "none";
+  } else {
+    document.getElementById("my-rank-pos").textContent = "#1º";
+    document.getElementById("my-score-count").textContent = `${localScore} / 6`;
+    document.getElementById("my-time-formatted").textContent = formatMinSecMs(finalElapsedMs);
+  }
+
+  // 3. Renderiza o Gabarito das 6 questões com verde (acertou) e vermelho (errou)
+  finalChoicesGrid.innerHTML = QUIZ_QUESTIONS.map((q) => {
+    const chosenLetter = userAnswers[q.number];
+    const chosenOpt = q.options.find((o) => o.letter === chosenLetter);
+    const correctOpt = q.options.find((o) => o.letter === q.correct);
+    const isCorrect = chosenLetter === q.correct;
+
+    const answerHtml = chosenOpt
+      ? `<span class="choice-a-letter">${chosenOpt.letter}</span><span>${chosenOpt.text}</span>`
+      : `<span class="choice-a-letter">?</span><span><em>Não respondida</em></span>`;
+
+    const correctHintHtml = !isCorrect && correctOpt
+      ? `<div class="choice-correct-hint">✓ Correta: <strong>${correctOpt.letter})</strong> ${correctOpt.text}</div>`
+      : `<div class="choice-correct-hint">✓ Você acertou!</div>`;
+
+    return `
+      <div class="choice-item ${isCorrect ? "is-correct" : "is-wrong"}">
+        <div class="choice-q">
+          <span class="choice-q-num">${q.number}</span>
+          <span>${q.question}</span>
+        </div>
+        <div class="choice-a">
+          ${answerHtml}
+        </div>
+        ${correctHintHtml}
+      </div>
+    `;
+  }).join("");
+}
+
+function leaveRoomAndReset() {
+  stopLocalMatchTimer();
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+  roomCode = null;
+  currentRoomData = null;
+  hasSubmitted = false;
+  Object.keys(userAnswers).forEach((k) => delete userAnswers[k]);
+  window.history.replaceState({}, "", window.location.pathname);
+  showSlide("0");
+}
+
+// ==========================================
+// INICIALIZAÇÃO E EVENTOS
+// ==========================================
+function initQuiz() {
+  renderQuestionSlides();
+  initMusicPlayer();
+
+  // Se a pessoa abriu o link com ?sala=XXXXX, já preenche o código de 5 dígitos automaticamente
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlRoomCode = urlParams.get("sala");
+  if (urlRoomCode) {
+    const codeInput = document.getElementById("input-room-code");
+    codeInput.value = urlRoomCode.trim().toUpperCase().slice(0, 5);
+  }
+
+  // Botões de Criar e Entrar na Sala
+  document.getElementById("btn-create-room").addEventListener("click", () => {
+    tryAutoPlay();
+    createRoom();
+  });
+
+  document.getElementById("btn-join-room").addEventListener("click", () => {
+    tryAutoPlay();
+    joinRoom();
+  });
+
+  document.getElementById("input-room-code").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      tryAutoPlay();
+      joinRoom();
+    }
+  });
+
+  // Botões do Lobby: Copiar Código e Copiar Link de Convite
+  const copyFeedback = document.getElementById("lobby-copy-feedback");
+
+  document.getElementById("btn-copy-code").addEventListener("click", () => {
+    if (!roomCode) return;
+    navigator.clipboard.writeText(roomCode).then(() => {
+      copyFeedback.textContent = `✓ Código ${roomCode} copiado!`;
+      setTimeout(() => { copyFeedback.textContent = ""; }, 3000);
+    });
+  });
+
+  document.getElementById("btn-copy-link").addEventListener("click", () => {
+    if (!roomCode) return;
+    const link = getShareableRoomLink(roomCode);
+    navigator.clipboard.writeText(link).then(() => {
+      copyFeedback.textContent = "✓ Link de convite copiado! Envie para os participantes.";
+      setTimeout(() => { copyFeedback.textContent = ""; }, 3500);
+    });
+  });
+
+  document.getElementById("btn-leave-lobby").addEventListener("click", leaveRoomAndReset);
+  document.getElementById("btn-start-match").addEventListener("click", startMatchAsHost);
+
+  // Eventos nos slides de perguntas (Opções e Navegação)
   slidesContainer.addEventListener("click", (e) => {
     tryAutoPlay();
 
@@ -498,27 +950,26 @@ function initQuiz() {
     if (navBtn) {
       const action = navBtn.dataset.action;
       const from = Number(navBtn.dataset.from);
-      if (action === "prev") {
-        goToSlide(from - 1);
-      } else if (action === "next") {
-        goToSlide(from + 1);
+      if (action === "prev" && from > 1) {
+        showSlide(String(from - 1));
+      } else if (action === "next" && from < 6) {
+        showSlide(String(from + 1));
+      } else if (action === "finish") {
+        submitMatchAnswers();
       }
     }
   });
 
-  document.getElementById("btn-restart-quiz").addEventListener("click", restartQuiz);
+  // Botões da Tela Final
+  document.getElementById("btn-restart-quiz").addEventListener("click", leaveRoomAndReset);
 
-  window.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowRight") {
-      if (currentSlide < 7) goToSlide(currentSlide + 1);
-    } else if (e.key === "ArrowLeft") {
-      if (currentSlide > 0) goToSlide(currentSlide - 1);
-    } else if (currentSlide >= 1 && currentSlide <= 6) {
-      const keyUpper = e.key.toUpperCase();
-      if (["A", "B", "C", "D"].includes(keyUpper)) {
-        selectOption(currentSlide, keyUpper);
-      }
-    }
+  document.getElementById("btn-back-lobby").addEventListener("click", async () => {
+    if (!roomCode || !playerId) return;
+    await fetch("/api/rooms/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: roomCode, playerId })
+    });
   });
 }
 
