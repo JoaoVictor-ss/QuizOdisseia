@@ -84,7 +84,7 @@ let roomCode = null;
 let playerId = null;
 let playerName = "";
 let isHost = false;
-let hostPlays = true; // Se o dono da sala vai jogar (true) ou só acompanhar o ranking (false)
+let hostPlays = true; // Ligado (true) = jogar, Desligado (false) = não jogar (só acompanhar)
 let currentRoomData = null;
 let eventSource = null;
 
@@ -95,7 +95,7 @@ let hostConnections = new Map();
 let guestConnection = null;
 let p2pRoomState = null;
 
-// Cronômetro de alta precisão (internamente mede milésimos; no topo exibe só Min:Seg)
+// Cronômetro de alta precisão
 let matchStartPerf = null;
 let timerIntervalId = null;
 let spectatorTimerIntervalId = null;
@@ -110,7 +110,6 @@ const timerTopbar = document.getElementById("timer-topbar");
 const timerRoomCode = document.getElementById("timer-room-code");
 const timerClockBox = document.getElementById("timer-clock-box");
 const timerRemainingEl = document.getElementById("timer-remaining");
-const timerElapsedEl = document.getElementById("timer-elapsed");
 
 // Elementos do Modal de Confirmação
 const confirmModal = document.getElementById("confirm-modal");
@@ -127,7 +126,7 @@ const btnMusicToggle = document.getElementById("btn-music-toggle");
 const musicToggleIcon = document.getElementById("music-toggle-icon");
 const musicToggleText = document.getElementById("music-toggle-text");
 const btnMute = document.getElementById("btn-mute");
-const volumeIcon = document.getElementById("volume-icon");
+const volumeSvgUse = document.getElementById("volume-svg-use");
 const volumeSlider = document.getElementById("volume-slider");
 const volumePercent = document.getElementById("volume-percent");
 
@@ -162,16 +161,6 @@ function formatMinSecMs(ms) {
   const sStr = String(seconds).padStart(2, "0");
   const msStr = String(millis).padStart(3, "0");
   return `${mStr}m ${sStr}s ${msStr}ms`;
-}
-
-/**
- * Formata milissegundos em "MMm SSs" (sem milésimos para a barra do topo)
- */
-function formatMinSecOnly(ms) {
-  const totalSec = Math.max(0, Math.floor(ms / 1000));
-  const minutes = Math.floor(totalSec / 60);
-  const seconds = totalSec % 60;
-  return `${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
 }
 
 /**
@@ -352,7 +341,7 @@ function updateMusicUI() {
   btnMusicToggle.classList.toggle("playing", isPlaying);
 
   if (isPlaying) {
-    musicToggleIcon.textContent = "⏸";
+    musicToggleIcon.textContent = "||";
     musicToggleText.textContent = "Pausar";
   } else {
     musicToggleIcon.textContent = "▶";
@@ -363,12 +352,8 @@ function updateMusicUI() {
   volumeSlider.value = String(effectiveVol);
   volumePercent.textContent = `${effectiveVol}%`;
 
-  if (effectiveVol === 0) {
-    volumeIcon.textContent = "🔇";
-  } else if (effectiveVol < 50) {
-    volumeIcon.textContent = "🔉";
-  } else {
-    volumeIcon.textContent = "🔊";
+  if (volumeSvgUse) {
+    volumeSvgUse.setAttribute("href", effectiveVol === 0 ? "#svg-speaker-off" : "#svg-speaker-on");
   }
 }
 
@@ -459,6 +444,7 @@ function initMusicPlayer() {
 
 // ==========================================
 // RENDERIZAÇÃO DOS SLIDES DE PERGUNTAS (1 A 6)
+// (Número centralizado em cima da questão)
 // ==========================================
 function renderQuestionSlides() {
   const fragment = document.createDocumentFragment();
@@ -518,7 +504,7 @@ function renderQuestionSlides() {
           ${
             isLastQuestion
               ? `<button type="button" class="btn-nav btn-finish-match" data-action="finish" data-from="${q.number}">
-                  <span>🏁 Finalizar e Enviar Respostas</span>
+                  <span>Finalizar e Enviar Respostas</span>
                 </button>`
               : `<button type="button" class="btn-nav btn-nav-primary" data-action="next" data-from="${q.number}">
                   <span>Próxima Questão</span>
@@ -567,7 +553,7 @@ function selectOption(questionNum, letter) {
 }
 
 // ==========================================
-// CRONÔMETRO DE 3 MINUTOS (NO TOPO SÓ MIN:SEG, NO FINAL COM MILÉSIMOS)
+// CRONÔMETRO DE 3 MINUTOS (NO TOPO SÓ TEMPO RESTANTE MIN:SEG; NO FINAL COM MILÉSIMOS)
 // ==========================================
 function startLocalMatchTimer() {
   stopLocalMatchTimer();
@@ -575,7 +561,6 @@ function startLocalMatchTimer() {
   matchStartPerf = performance.now();
   timerRoomCode.textContent = roomCode || "-----";
   timerRemainingEl.textContent = "03:00";
-  timerElapsedEl.textContent = "00m 00s";
 
   timerIntervalId = setInterval(() => {
     if (hasSubmitted) return;
@@ -583,7 +568,6 @@ function startLocalMatchTimer() {
     const remaining = Math.max(0, MAX_TIME_MS - elapsed);
 
     timerRemainingEl.textContent = formatCountdownMinSec(remaining);
-    timerElapsedEl.textContent = formatMinSecOnly(elapsed);
     timerClockBox.classList.toggle("urgent", remaining <= 30000);
 
     if (remaining <= 0) {
@@ -893,7 +877,7 @@ function handleRoomStateUpdate(room) {
       btn.setAttribute("aria-pressed", "false");
     });
 
-    // Se for o dono da sala e escolheu NÃO jogar (apenas acompanhar o ranking)
+    // Se for o dono da sala e o switch estiver desligado (apenas acompanhar o ranking)
     if (isHost && !hostPlays) {
       hasSubmitted = true;
       stopLocalMatchTimer();
@@ -924,33 +908,32 @@ function handleRoomStateUpdate(room) {
 function updateLobbyUI(room) {
   document.getElementById("lobby-room-code").textContent = room.code;
   document.getElementById("lobby-players-count").textContent = `${room.playersCount} / ${room.maxPlayers}`;
-  document.getElementById("lobby-share-url-preview").textContent = `Link de convite: ${getShareableRoomLink(room.code)}`;
+  // Mostra apenas o link puro, sem "Link de convite:"
+  document.getElementById("lobby-share-url-preview").textContent = getShareableRoomLink(room.code);
 
+  // Na lista de tripulantes, deixa apenas o emoji de coroa (👑) para quem é o dono da sala
   const grid = document.getElementById("lobby-players-grid");
   grid.innerHTML = room.players
     .map((p) => {
       const isMe = p.id === playerId;
-      const crown = p.isHost ? "👑 " : "⚓ ";
+      const crown = p.isHost ? "👑 " : "";
       const meLabel = isMe ? " (Você)" : "";
-      const specLabel = p.isSpectator ? " — Só acompanhando" : "";
       return `
         <div class="lobby-player-chip ${isMe ? "is-me" : ""} ${p.isSpectator ? "is-spectator" : ""}">
-          <span>${crown}${escapeHtml(p.name)}${meLabel}${specLabel}</span>
+          <span>${crown}${escapeHtml(p.name)}${meLabel}</span>
         </div>
       `;
     })
     .join("");
 
   const hostModeBar = document.getElementById("lobby-host-mode-bar");
-  const btnModePlay = document.getElementById("btn-mode-play");
-  const btnModeSpectate = document.getElementById("btn-mode-spectate");
+  const hostPlaySwitch = document.getElementById("input-host-play-switch");
   const hostControls = document.getElementById("lobby-host-controls");
   const guestWaiting = document.getElementById("lobby-guest-waiting");
 
   if (isHost) {
-    hostModeBar.style.display = "flex";
-    btnModePlay.classList.toggle("active", hostPlays);
-    btnModeSpectate.classList.toggle("active", !hostPlays);
+    hostModeBar.style.display = "inline-flex";
+    if (hostPlaySwitch) hostPlaySwitch.checked = hostPlays;
     hostControls.style.display = "block";
     guestWaiting.style.display = "none";
   } else {
@@ -962,7 +945,8 @@ function updateLobbyUI(room) {
 
 async function setHostPlayMode(shouldPlay) {
   hostPlays = Boolean(shouldPlay);
-  document.getElementById("check-host-plays").checked = hostPlays;
+  const hostPlaySwitch = document.getElementById("input-host-play-switch");
+  if (hostPlaySwitch) hostPlaySwitch.checked = hostPlays;
 
   if (!roomCode || !playerId || !isHost) return;
 
@@ -995,10 +979,8 @@ function escapeHtml(str) {
 
 async function createRoom() {
   const nameInput = document.getElementById("input-player-name");
-  const hostPlaysCheckbox = document.getElementById("check-host-plays");
   const errorEl = document.getElementById("entry-error-msg");
   const name = nameInput.value.trim();
-  const ownerPlays = hostPlaysCheckbox ? hostPlaysCheckbox.checked : true;
 
   if (!name) {
     errorEl.textContent = "Por favor, digite seu nome antes de criar a sala.";
@@ -1007,6 +989,8 @@ async function createRoom() {
   }
 
   errorEl.textContent = "";
+  const ownerPlays = true; // Padrão ligado ao criar; pode alternar no switch dentro do Lobby
+
   try {
     const res = await fetch("/api/rooms/create", {
       method: "POST",
@@ -1191,7 +1175,6 @@ function renderFinalRankingAndChoices(room) {
   const myScoreSummary = document.getElementById("my-score-summary");
   const finalChoicesBox = document.getElementById("final-choices-box");
 
-  // Se o dono escolheu apenas acompanhar o ranking, oculta as caixas de resposta individual dele
   myScoreSummary.style.display = isSpectatingHost ? "none" : "grid";
   finalChoicesBox.style.display = isSpectatingHost ? "none" : "block";
 
@@ -1227,18 +1210,18 @@ function renderFinalRankingAndChoices(room) {
     } else {
       tbody.innerHTML = room.ranking
         .map((p, idx) => {
-          const pos = idx + 1;
-          const medal = pos === 1 ? "🥇 1º" : pos === 2 ? "🥈 2º" : pos === 3 ? "🥉 3º" : `${pos}º`;
+          const pos = `${idx + 1}º`;
           const isMe = p.id === playerId;
+          const crown = p.isHost ? "👑 " : "";
           const meBadge = isMe ? `<span class="me-tag">Você</span>` : "";
           const scoreText = p.finished ? `${p.score} / 6` : "—";
-          // No Ranking Final exibe Minuto, Segundo e Milésimo para desempate!
-          const timeText = p.finished ? formatMinSecMs(p.elapsedMs) : "⏳ Respondendo...";
+          // No Ranking Final exibe Minuto, Segundo e Milésimo para desempate
+          const timeText = p.finished ? formatMinSecMs(p.elapsedMs) : "Respondendo...";
 
           return `
             <tr class="${isMe ? "is-me-row" : ""}">
-              <td>${medal}</td>
-              <td>${escapeHtml(p.name)}${meBadge}</td>
+              <td>${pos}</td>
+              <td>${crown}${escapeHtml(p.name)}${meBadge}</td>
               <td>${scoreText}</td>
               <td class="col-time">${timeText}</td>
             </tr>
@@ -1384,26 +1367,22 @@ function initQuiz() {
     }
   });
 
-  // Toggle no Lobby: Dono da sala joga ou só acompanha
-  document.getElementById("btn-mode-play").addEventListener("click", () => setHostPlayMode(true));
-  document.getElementById("btn-mode-spectate").addEventListener("click", () => setHostPlayMode(false));
+  // Switch no Lobby: Ligado = Jogar, Desligado = Não jogar
+  const hostPlaySwitch = document.getElementById("input-host-play-switch");
+  if (hostPlaySwitch) {
+    hostPlaySwitch.addEventListener("change", (e) => {
+      setHostPlayMode(e.target.checked);
+    });
+  }
 
   const copyFeedback = document.getElementById("lobby-copy-feedback");
-
-  document.getElementById("btn-copy-code").addEventListener("click", () => {
-    if (!roomCode) return;
-    navigator.clipboard.writeText(roomCode).then(() => {
-      copyFeedback.textContent = `✓ Código ${roomCode} copiado!`;
-      setTimeout(() => { copyFeedback.textContent = ""; }, 3000);
-    });
-  });
 
   document.getElementById("btn-copy-link").addEventListener("click", () => {
     if (!roomCode) return;
     const link = getShareableRoomLink(roomCode);
     navigator.clipboard.writeText(link).then(() => {
-      copyFeedback.textContent = "✓ Link de convite copiado! Envie para os participantes.";
-      setTimeout(() => { copyFeedback.textContent = ""; }, 3500);
+      copyFeedback.textContent = "✓ Link copiado!";
+      setTimeout(() => { copyFeedback.textContent = ""; }, 3000);
     });
   });
 

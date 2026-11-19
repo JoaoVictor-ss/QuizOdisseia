@@ -102,7 +102,6 @@ html, body {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 1rem;
   line-height: 1;
   padding: 2px;
   display: flex;
@@ -151,7 +150,7 @@ html, body {
 }
 
 /* ==========================================
-   BARRA DE CRONÔMETRO DE 3 MINUTOS (LARGURA 100% TRAVADA SEM MEXER)
+   BARRA DE CRONÔMETRO DE 3 MINUTOS (SÓ TEMPO RESTANTE, LARGURA TRAVADA)
    ========================================== */
 .timer-topbar {
   position: fixed;
@@ -161,8 +160,9 @@ html, body {
   z-index: 95;
   display: none;
   align-items: center;
-  gap: 16px;
-  padding: 8px 20px;
+  justify-content: center;
+  gap: 14px;
+  padding: 7px 18px;
   background: var(--pill-bg);
   border: 2px solid var(--navy-dark);
   border-radius: 999px;
@@ -186,48 +186,26 @@ html, body {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 1rem;
+  font-size: 0.98rem;
   color: var(--navy-dark);
 }
 
-/* Fonte monoespaçada e largura fixa para o número nunca mexer ao mudar */
 .timer-digits {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-weight: 800;
-  font-size: 1.08rem;
+  font-size: 1.06rem;
   background: var(--navy-dark);
   color: var(--white);
   padding: 4px 0;
   border-radius: 999px;
-  width: 74px;
+  width: 72px;
   display: inline-block;
   text-align: center;
 }
 
 .timer-clock-box.urgent .timer-digits {
   background: var(--red-wrong);
-}
-
-.timer-elapsed-box {
-  font-family: var(--font-body);
-  font-size: 0.88rem;
-  font-weight: 800;
-  color: var(--navy-mid);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.timer-elapsed-digits {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.9rem;
-  font-weight: 800;
-  width: 72px;
-  display: inline-block;
-  text-align: center;
-  color: var(--navy-dark);
 }
 
 /* ==========================================
@@ -252,7 +230,7 @@ html, body {
   width: 100%;
   min-height: 100dvh;
   background-color: var(--bg-parchment);
-  padding: 64px 32px 140px;
+  padding: 64px 28px 135px;
   display: none;
   flex-direction: column;
   align-items: center;
@@ -288,7 +266,7 @@ html, body {
   left: 0;
   right: 0;
   bottom: -10px;
-  height: 150px;
+  height: 145px;
   z-index: 1;
   pointer-events: none;
 }
@@ -305,7 +283,7 @@ html, body {
    ========================================== */
 .slide-card[data-slide="0"] {
   padding-top: 24px;
-  padding-bottom: 74px;
+  padding-bottom: 72px;
   justify-content: space-between;
 }
 
@@ -369,7 +347,7 @@ html, body {
   z-index: 3;
 }
 
-/* Painel de Criar / Entrar em Sala */
+/* Painel de Criar / Entrar em Sala (100% Centralizado) */
 .entry-hub-card {
   width: 100%;
   max-width: 680px;
@@ -424,50 +402,27 @@ html, body {
   background: rgba(184, 206, 226, 0.42);
   border: 1.5px solid rgba(16, 45, 79, 0.22);
   border-radius: 16px;
-  padding: 14px 16px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
+  align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  text-align: left;
+  gap: 10px;
+  text-align: center;
 }
 
 .entry-box-title {
   font-family: var(--font-display);
-  font-size: 1.05rem;
+  font-size: 1.08rem;
   font-weight: 700;
   color: var(--navy-dark);
 }
 
 .entry-box-desc {
-  font-size: 0.85rem;
+  font-size: 0.86rem;
   font-weight: 700;
   color: var(--text-body);
   line-height: 1.28;
-}
-
-.host-mode-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
-  font-weight: 800;
-  color: var(--navy-dark);
-  cursor: pointer;
-}
-
-.host-mode-checkbox input {
-  width: 17px;
-  height: 17px;
-  accent-color: var(--navy-dark);
-  cursor: pointer;
-}
-
-.host-mode-subhint {
-  font-size: 0.76rem;
-  font-weight: 700;
-  color: var(--navy-mid);
-  line-height: 1.2;
 }
 
 .btn-entry-primary,
@@ -477,7 +432,7 @@ html, body {
   font-family: var(--font-display);
   font-size: 1rem;
   font-weight: 700;
-  padding: 10px 18px;
+  padding: 10px 22px;
   border-radius: 999px;
   border: none;
   cursor: pointer;
@@ -486,6 +441,11 @@ html, body {
   justify-content: center;
   gap: 8px;
   transition: background 0.2s, transform 0.2s;
+}
+
+.btn-entry-primary {
+  width: 100%;
+  max-width: 220px;
 }
 
 .btn-entry-primary:hover,
@@ -497,7 +457,9 @@ html, body {
 .join-code-row {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  width: 100%;
   margin-top: auto;
 }
 
@@ -546,37 +508,43 @@ html, body {
 }
 
 /* ==========================================
-   TELA LOBBY: SALA DE ESPERA
+   TELA LOBBY: SALA DE ESPERA (COMPACTA COM SCROLL)
    ========================================== */
+.slide-card[data-slide="lobby"] {
+  padding-top: 56px;
+  padding-bottom: 115px;
+}
+
 .lobby-layout {
   position: relative;
   z-index: 3;
   width: 100%;
-  max-width: 820px;
+  max-width: 780px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .lobby-header-card {
   background: var(--blue-card);
   border: 2px solid var(--navy-dark);
   border-radius: 22px;
-  padding: 18px 24px;
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
   text-align: center;
+  width: 100%;
 }
 
 .lobby-badge-top {
   background: var(--navy-dark);
   color: var(--white);
   font-family: var(--font-display);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 700;
-  letter-spacing: 1px;
+  letter-spacing: 0.8px;
   padding: 5px 16px;
   border-radius: 999px;
 }
@@ -586,7 +554,7 @@ html, body {
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px;
   width: 100%;
 }
 
@@ -594,39 +562,32 @@ html, body {
   background: var(--pill-bg);
   border: 2px solid var(--navy-dark);
   border-radius: 16px;
-  padding: 8px 20px;
+  padding: 7px 18px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .lobby-code-label {
   font-weight: 800;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   color: var(--navy-dark);
 }
 
 .lobby-code-digits {
   font-family: var(--font-mono);
-  font-size: 1.9rem;
+  font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: 3px;
   color: var(--navy-dark);
 }
 
-.lobby-share-buttons {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
 .btn-share {
-  background: var(--pill-bg);
-  color: var(--navy-dark);
+  background: var(--navy-dark);
+  color: var(--white);
   border: 2px solid var(--navy-dark);
   border-radius: 999px;
-  padding: 9px 16px;
+  padding: 9px 20px;
   font-family: var(--font-display);
   font-size: 0.92rem;
   font-weight: 700;
@@ -635,92 +596,115 @@ html, body {
 }
 
 .btn-share:hover {
-  background: var(--white);
+  background: var(--navy-mid);
   transform: translateY(-1px);
 }
 
-.btn-share-link {
-  background: var(--navy-dark);
-  color: var(--white);
-}
-
-.btn-share-link:hover {
-  background: var(--navy-mid);
-  color: var(--white);
-}
-
+/* Link em 1 única linha com reticências (...) se não couber */
 .lobby-share-url-preview {
-  font-size: 0.82rem;
+  width: 100%;
+  max-width: 100%;
+  font-size: 0.84rem;
   font-weight: 700;
   color: var(--navy-dark);
-  background: rgba(250, 246, 238, 0.75);
-  padding: 5px 14px;
+  background: rgba(250, 246, 238, 0.78);
+  padding: 6px 14px;
   border-radius: 999px;
-  word-break: break-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }
 
 .lobby-copy-feedback {
-  font-size: 0.86rem;
+  font-size: 0.84rem;
   font-weight: 800;
   color: var(--green-correct);
-  min-height: 16px;
+  min-height: 14px;
 }
 
-/* Barra de seleção do Modo do Dono da Sala no Lobby */
-.lobby-host-mode-bar {
-  width: 100%;
+/* Switchzinho para o dono da sala escolher se joga (ligado) ou não joga (desligado) */
+.lobby-host-switch-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--pill-bg);
   border: 1.5px solid var(--navy-dark);
-  border-radius: 14px;
-  padding: 10px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.host-mode-bar-label {
-  font-family: var(--font-display);
-  font-size: 0.92rem;
-  font-weight: 700;
-  color: var(--navy-dark);
-}
-
-.host-mode-toggle-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.btn-host-mode {
-  background: var(--white);
-  color: var(--navy-dark);
-  border: 1.5px solid var(--pill-border);
   border-radius: 999px;
-  padding: 6px 14px;
-  font-family: var(--font-display);
-  font-size: 0.86rem;
-  font-weight: 600;
+  padding: 6px 16px;
+}
+
+.host-switch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
   cursor: pointer;
-  transition: all 0.2s;
+  user-select: none;
 }
 
-.btn-host-mode.active {
-  background: var(--navy-dark);
-  color: var(--white);
-  border-color: var(--navy-dark);
+.host-switch-text {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--navy-dark);
 }
 
+.switch-wrap {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  display: inline-block;
+}
+
+.switch-checkbox {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.switch-slider {
+  position: absolute;
+  inset: 0;
+  background-color: var(--blue-card);
+  border: 1.5px solid var(--navy-dark);
+  border-radius: 999px;
+  transition: background-color 0.2s;
+}
+
+.switch-slider::before {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: var(--white);
+  border: 1.5px solid var(--navy-dark);
+  border-radius: 50%;
+  transition: transform 0.2s, background-color 0.2s;
+}
+
+.switch-checkbox:checked + .switch-slider {
+  background-color: var(--navy-dark);
+}
+
+.switch-checkbox:checked + .switch-slider::before {
+  transform: translate(19px, -50%);
+  background-color: var(--white);
+  border-color: var(--white);
+}
+
+/* Lista de Tripulantes com Scroll fixo para não esconder o botão Iniciar */
 .lobby-players-card {
   background: var(--pill-bg);
   border: 2px solid var(--pill-border);
   border-radius: 20px;
-  padding: 16px 20px;
+  padding: 14px 18px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .lobby-players-header {
@@ -731,7 +715,7 @@ html, body {
 
 .lobby-players-header h3 {
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   color: var(--navy-dark);
 }
 
@@ -739,31 +723,46 @@ html, body {
   background: var(--navy-dark);
   color: var(--white);
   font-family: var(--font-display);
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   font-weight: 700;
-  padding: 4px 14px;
+  padding: 3px 12px;
   border-radius: 999px;
 }
 
 .lobby-players-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
-  gap: 10px;
-  max-height: 200px;
+  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+  gap: 8px;
+  max-height: 140px;
   overflow-y: auto;
+  padding-right: 4px;
+}
+
+.lobby-players-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.lobby-players-grid::-webkit-scrollbar-track {
+  background: rgba(16, 45, 79, 0.08);
+  border-radius: 999px;
+}
+
+.lobby-players-grid::-webkit-scrollbar-thumb {
+  background: var(--navy-dark);
+  border-radius: 999px;
 }
 
 .lobby-player-chip {
   background: var(--blue-card);
   border: 1.5px solid var(--navy-dark);
   border-radius: 12px;
-  padding: 8px 12px;
+  padding: 7px 12px;
   font-weight: 800;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   color: var(--navy-dark);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .lobby-player-chip.is-me {
@@ -782,7 +781,7 @@ html, body {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
 .btn-start-match {
@@ -790,9 +789,9 @@ html, body {
   color: var(--white);
   border: 2px solid var(--navy-dark);
   border-radius: 999px;
-  padding: 12px 28px;
+  padding: 11px 24px;
   font-family: var(--font-display);
-  font-size: 1.12rem;
+  font-size: 1.06rem;
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.2s, filter 0.2s;
@@ -807,7 +806,7 @@ html, body {
   background: var(--blue-card);
   color: var(--navy-dark);
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: 0.96rem;
   font-weight: 700;
   padding: 10px 20px;
   border-radius: 999px;
@@ -816,73 +815,80 @@ html, body {
 
 /* ==========================================
    TELAS 1 A 6: PERGUNTAS
+   (Número no meio em cima da questão, sem espaço vazio à esquerda)
    ========================================== */
 .question-layout {
   position: relative;
   z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   width: 100%;
-  max-width: 800px;
+  max-width: 760px;
   margin: 0 auto;
 }
 
 .question-header-row {
   display: flex;
-  align-items: flex-start;
-  gap: 18px;
+  flex-direction: column;
+  align-items: center;
   position: relative;
+  width: 100%;
 }
 
 .question-number-badge {
   flex-shrink: 0;
-  width: 58px;
-  height: 58px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   background: var(--navy-dark);
   color: var(--white);
+  border: 3.5px solid var(--bg-parchment);
   font-family: var(--font-display);
-  font-size: 1.9rem;
+  font-size: 1.75rem;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 2px;
+  margin-bottom: -24px;
+  position: relative;
+  z-index: 3;
 }
 
 .question-box-wrap {
   position: relative;
-  flex: 1;
+  width: 100%;
 }
 
 .question-box {
   background: var(--blue-card);
   border-radius: var(--radius-box);
-  padding: 20px 28px;
+  padding: 32px 26px 20px;
   color: var(--navy-dark);
   font-family: var(--font-body);
-  font-size: clamp(1.08rem, 2.05vw, 1.34rem);
+  font-size: clamp(1.06rem, 2.05vw, 1.32rem);
   font-weight: 800;
   line-height: 1.34;
-  text-align: left;
+  text-align: center;
+  width: 100%;
 }
 
 .question-burst {
   position: absolute;
   top: -10px;
-  right: -42px;
-  width: 36px;
-  height: 40px;
+  right: -38px;
+  width: 34px;
+  height: 38px;
   pointer-events: none;
 }
 
-/* Opções A, B, C, D */
+/* Opções A, B, C, D alinhadas na mesma largura da pergunta */
 .options-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding-left: 76px;
+  gap: 11px;
+  width: 100%;
+  padding-left: 0;
 }
 
 .option-btn {
@@ -891,10 +897,10 @@ html, body {
   background: var(--pill-bg);
   border: 1.5px solid var(--pill-border);
   border-radius: 999px;
-  padding: 8px 22px 8px 8px;
+  padding: 8px 20px 8px 8px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   text-align: left;
   cursor: pointer;
   transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
@@ -921,7 +927,7 @@ html, body {
   background: var(--navy-dark);
   color: var(--white);
   font-family: var(--font-display);
-  font-size: 1.32rem;
+  font-size: 1.3rem;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -933,7 +939,7 @@ html, body {
 }
 
 .option-text {
-  font-size: clamp(0.96rem, 1.75vw, 1.12rem);
+  font-size: clamp(0.95rem, 1.75vw, 1.12rem);
   font-weight: 700;
   line-height: 1.28;
   color: var(--text-dark);
@@ -969,7 +975,8 @@ html, body {
   align-items: center;
   justify-content: space-between;
   margin-top: 4px;
-  padding-left: 76px;
+  width: 100%;
+  padding-left: 0;
 }
 
 .btn-nav {
@@ -984,6 +991,7 @@ html, body {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   transition: background 0.2s ease, transform 0.2s ease;
 }
@@ -1484,17 +1492,22 @@ html, body {
     left: auto;
     transform: none;
     margin: 8px auto 0;
-    flex-wrap: wrap;
     justify-content: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-radius: 16px;
-    width: calc(100% - 24px);
+    gap: 10px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    width: calc(100% - 28px);
   }
 
   .slide-card {
     min-height: calc(100dvh - 54px);
-    padding: 18px 14px 110px;
+    padding: 16px 14px 98px;
+  }
+
+  .slide-card[data-slide="lobby"] {
+    padding-top: 12px;
+    padding-bottom: 92px;
+    justify-content: flex-start;
   }
 
   .title-rays-left,
@@ -1508,32 +1521,70 @@ html, body {
 
   .entry-name-row {
     flex-direction: column;
-    align-items: stretch;
+    align-items: center;
     gap: 6px;
+    text-align: center;
+  }
+
+  .entry-input {
+    width: 100%;
+    text-align: center;
   }
 
   .entry-actions-grid {
     grid-template-columns: 1fr;
   }
 
-  .question-header-row {
-    gap: 10px;
+  .join-code-row {
+    justify-content: center;
+  }
+
+  .lobby-header-card {
+    padding: 14px 14px;
+    gap: 8px;
+  }
+
+  .lobby-players-card {
+    padding: 12px 14px;
+  }
+
+  .lobby-players-grid {
+    max-height: 112px;
+    grid-template-columns: 1fr;
+  }
+
+  .lobby-footer-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  #lobby-host-controls,
+  .btn-start-match,
+  #btn-leave-lobby {
+    width: 100%;
   }
 
   .question-number-badge {
-    width: 44px;
-    height: 44px;
-    font-size: 1.45rem;
+    width: 48px;
+    height: 48px;
+    font-size: 1.55rem;
+    margin-bottom: -22px;
   }
 
   .question-box {
-    padding: 15px 16px;
+    padding: 28px 16px 16px;
     font-size: 1.02rem;
   }
 
-  .options-list,
   .question-nav-footer {
-    padding-left: 0;
+    gap: 8px;
+  }
+
+  .question-nav-footer .btn-nav {
+    flex: 1;
+    padding: 10px 12px;
+    font-size: 0.94rem;
   }
 
   .my-score-summary,
@@ -1548,6 +1599,6 @@ html, body {
   }
 
   .waves-footer {
-    height: 86px;
+    height: 78px;
   }
 }
