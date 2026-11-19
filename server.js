@@ -250,11 +250,15 @@ function serveStaticFile(req, res, filePath) {
       });
       fs.createReadStream(filePath, { start, end }).pipe(res);
     } else {
-      res.writeHead(200, {
+      const headers = {
         "Content-Length": stat.size,
         "Content-Type": contentType,
         "Accept-Ranges": "bytes"
-      });
+      };
+      if ([".html", ".css", ".js"].includes(ext)) {
+        headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+      }
+      res.writeHead(200, headers);
       fs.createReadStream(filePath).pipe(res);
     }
   });

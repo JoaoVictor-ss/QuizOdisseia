@@ -1115,9 +1115,9 @@ html, body {
 .final-compass-wrap {
   position: absolute;
   right: 0;
-  top: 0;
-  width: clamp(76px, 8vw, 105px);
-  height: clamp(76px, 8vw, 105px);
+  top: 46px;
+  width: clamp(72px, 7.5vw, 96px);
+  height: clamp(72px, 7.5vw, 96px);
   z-index: 2;
   pointer-events: none;
 }
