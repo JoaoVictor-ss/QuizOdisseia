@@ -5,6 +5,7 @@ const crypto = require("crypto");
 
 const PORT = process.env.PORT || 8090;
 const PUBLIC_DIR = __dirname;
+const CACHE_FILE = path.join(__dirname, ".rooms-cache.json");
 
 // Gabarito oficial das 6 questões
 const CORRECT_ANSWERS = {
@@ -23,6 +24,61 @@ const MAX_PLAYERS_PER_ROOM = 40;
 const rooms = new Map();
 const sseClients = new Map();
 
+// Carrega backup das salas do disco caso o servidor reinicie
+function loadRoomsFromCache() {
+  try {
+    if (!fs.existsSync(CACHE_FILE)) return;
+    const raw = fs.readFileSync(CACHE_FILE, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return;
+    const now = Date.now();
+    const sixHours = 6 * 60 * 60 * 1000;
+    for (const r of parsed) {
+      if (r && r.code && now - (r.createdAt || now) < sixHours) {
+        const playersMap = new Map();
+        if (Array.isArray(r.players)) {
+          for (const p of r.players) {
+            if (p && p.id) playersMap.set(p.id, p);
+          }
+        }
+        rooms.set(r.code, {
+          code: r.code,
+          hostId: r.hostId,
+          hostPlays: r.hostPlays !== false,
+          status: r.status || "lobby",
+          createdAt: r.createdAt || now,
+          startedAt: r.startedAt || null,
+          players: playersMap
+        });
+      }
+    }
+  } catch {
+    // Ignora erro de leitura de cache
+  }
+}
+
+function saveRoomsToCache() {
+  try {
+    const dump = [];
+    for (const room of rooms.values()) {
+      dump.push({
+        code: room.code,
+        hostId: room.hostId,
+        hostPlays: room.hostPlays,
+        status: room.status,
+        createdAt: room.createdAt,
+        startedAt: room.startedAt,
+        players: Array.from(room.players.values())
+      });
+    }
+    fs.writeFile(CACHE_FILE, JSON.stringify(dump), () => {});
+  } catch {
+    // Ignora erro de escrita de cache
+  }
+}
+
+loadRoomsFromCache();
+
 function generateRoomCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
@@ -39,26 +95,33 @@ function generatePlayerId() {
   return crypto.randomBytes(8).toString("hex");
 }
 
+function calculateOfficialScore(answers) {
+  let score = 0;
+  if (!answers || typeof answers !== "object") return 0;
+  for (let q = 1; q <= 6; q++) {
+    const chosen = String(answers[q] || "").toUpperCase();
+    if (chosen && chosen === CORRECT_ANSWERS[q]) {
+      score++;
+    }
+  }
+  return score;
+}
+
 function serializeRoom(room) {
   const allUsers = Array.from(room.players.values()).map((p) => ({
     id: p.id,
     name: p.name,
     isHost: p.id === room.hostId,
     isSpectator: Boolean(p.isSpectator),
-    finished: p.finished,
-    score: p.score,
+    finished: Boolean(p.finished),
+    score: typeof p.score === "number" ? p.score : 0,
     totalQuestions: 6,
     elapsedMs: p.elapsedMs,
-    joinedAt: p.joinedAt
+    joinedAt: p.joinedAt || Date.now()
   }));
 
-  // Apenas participantes que estão jogando entram no Ranking
   const activePlayers = allUsers.filter((p) => !p.isSpectator);
 
-  // Ordena o Ranking:
-  // 1) Quem já terminou vem antes de quem ainda está respondendo
-  // 2) Maior número de acertos (score DESC)
-  // 3) Menor tempo de resposta em milésimos (elapsedMs ASC)
   const ranking = [...activePlayers].sort((a, b) => {
     if (a.finished !== b.finished) {
       return a.finished ? -1 : 1;
@@ -76,7 +139,7 @@ function serializeRoom(room) {
     code: room.code,
     hostId: room.hostId,
     hostPlays: room.hostPlays,
-    status: room.status, // 'lobby' | 'playing' | 'finished'
+    status: room.status,
     startedAt: room.startedAt,
     serverNow: Date.now(),
     maxPlayers: MAX_PLAYERS_PER_ROOM,
@@ -87,6 +150,7 @@ function serializeRoom(room) {
 }
 
 function broadcastRoom(code) {
+  saveRoomsToCache();
   const room = rooms.get(code);
   const clients = sseClients.get(code);
   if (!room || !clients || clients.size === 0) return;
@@ -101,7 +165,6 @@ function broadcastRoom(code) {
   }
 }
 
-// Limpeza periódica de salas inativas há mais de 6 horas
 setInterval(() => {
   const now = Date.now();
   const sixHours = 6 * 60 * 60 * 1000;
@@ -111,6 +174,7 @@ setInterval(() => {
       sseClients.delete(code);
     }
   }
+  saveRoomsToCache();
 }, 30 * 60 * 1000);
 
 function readJsonBody(req) {
@@ -205,7 +269,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readJsonBody(req);
       const name = String(body.playerName || "").trim().slice(0, 40);
-      const hostPlays = body.hostPlays !== false; // default true
+      const hostPlays = body.hostPlays !== false;
 
       if (!name) {
         return sendJson(res, 400, { error: "Digite seu nome para criar a sala." });
@@ -237,6 +301,7 @@ const server = http.createServer(async (req, res) => {
       });
 
       rooms.set(code, room);
+      saveRoomsToCache();
       return sendJson(res, 200, {
         code,
         playerId,
@@ -273,6 +338,79 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { room: serializeRoom(room) });
     } catch {
       return sendJson(res, 400, { error: "Erro ao atualizar modo do criador." });
+    }
+  }
+
+  // 1c. Reidratar sessão/sala caso o cliente volte de outra aba ou o servidor tenha reiniciado
+  if (req.method === "POST" && pathname === "/api/rooms/rehydrate") {
+    try {
+      const body = await readJsonBody(req);
+      const code = String(body.code || "").trim().toUpperCase();
+      const playerId = String(body.playerId || "");
+      const playerName = String(body.playerName || "Tripulante").trim().slice(0, 40);
+      if (!code || code.length !== 5 || !playerId) {
+        return sendJson(res, 400, { error: "Dados inválidos para restaurar sessão." });
+      }
+
+      let room = rooms.get(code);
+      const now = Date.now();
+      if (!room) {
+        // Recria a sala se o servidor do Render tiver reiniciado durante a partida
+        room = {
+          code,
+          hostId: body.isHost ? playerId : (body.hostId || playerId),
+          hostPlays: body.hostPlays !== false,
+          status: body.roomStatus || (body.hasSubmitted ? "playing" : "lobby"),
+          createdAt: now,
+          startedAt: body.startedAt || now,
+          players: new Map()
+        };
+        if (Array.isArray(body.cachedPlayers)) {
+          for (const cp of body.cachedPlayers) {
+            if (cp && cp.id) {
+              room.players.set(cp.id, {
+                id: cp.id,
+                name: String(cp.name || "Tripulante").slice(0, 40),
+                isSpectator: Boolean(cp.isSpectator),
+                joinedAt: cp.joinedAt || now,
+                finished: Boolean(cp.finished),
+                score: typeof cp.score === "number" ? cp.score : 0,
+                elapsedMs: cp.elapsedMs || null,
+                answers: {}
+              });
+            }
+          }
+        }
+        rooms.set(code, room);
+      }
+
+      let player = room.players.get(playerId);
+      if (!player) {
+        player = {
+          id: playerId,
+          name: playerName,
+          isSpectator: Boolean(body.isHost && body.hostPlays === false),
+          joinedAt: now,
+          finished: false,
+          score: 0,
+          elapsedMs: null,
+          answers: {}
+        };
+        room.players.set(playerId, player);
+      }
+
+      if (body.hasSubmitted && !player.isSpectator) {
+        const answers = body.answers && typeof body.answers === "object" ? body.answers : player.answers;
+        player.finished = true;
+        player.answers = answers;
+        player.score = calculateOfficialScore(answers);
+        player.elapsedMs = Math.min(MAX_TIME_MS, Math.max(100, Number(body.elapsedMs) || player.elapsedMs || MAX_TIME_MS));
+      }
+
+      broadcastRoom(code);
+      return sendJson(res, 200, { room: serializeRoom(room) });
+    } catch {
+      return sendJson(res, 400, { error: "Erro ao restaurar sessão." });
     }
   }
 
@@ -392,14 +530,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (!player.finished && !player.isSpectator) {
-        let score = 0;
-        for (let q = 1; q <= 6; q++) {
-          const chosen = String(answers[q] || "").toUpperCase();
-          if (chosen && chosen === CORRECT_ANSWERS[q]) {
-            score++;
-          }
-        }
-
+        const score = calculateOfficialScore(answers);
         const rawElapsed = Number(body.elapsedMs);
         const serverElapsed = room.startedAt ? Date.now() - room.startedAt : MAX_TIME_MS;
         const validElapsed = Number.isFinite(rawElapsed) && rawElapsed > 0

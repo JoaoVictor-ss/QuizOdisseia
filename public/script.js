@@ -76,6 +76,7 @@ const QUIZ_QUESTIONS = [
 const MAX_TIME_MS = 3 * 60 * 1000; // 3 minutos = 180.000 ms
 const MAX_PLAYERS = 40;
 const PEER_PREFIX = "odisseia-quiz-2026-";
+const STORAGE_KEY = "quiz_odisseia_session_v2";
 
 // Estado da Sessão e Sala Multiplayer
 let currentSlide = "0"; // '0' | 'lobby' | '1'..'6' | '7'
@@ -95,8 +96,8 @@ let hostConnections = new Map();
 let guestConnection = null;
 let p2pRoomState = null;
 
-// Cronômetro de alta precisão
-let matchStartPerf = null;
+// Cronômetro baseado em timestamp real (Date.now()) para não perder tempo se sair da aba/tela
+let matchStartWallTime = null;
 let timerIntervalId = null;
 let spectatorTimerIntervalId = null;
 let hasSubmitted = false;
@@ -134,6 +135,63 @@ let userManuallyPaused = false;
 let masterVolume = 0.65;
 let isMuted = false;
 let previousVolume = 0.65;
+
+// ==========================================
+// PERSISTÊNCIA DE SESSÃO (PARA NADA SUMIR AO SAIR E VOLTAR DA TELA/ABA)
+// ==========================================
+function saveSessionState() {
+  try {
+    if (!roomCode) {
+      sessionStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    const payload = JSON.stringify({
+      savedAt: Date.now(),
+      roomCode,
+      playerId,
+      playerName,
+      isHost,
+      hostPlays,
+      currentSlide,
+      userAnswers: { ...userAnswers },
+      hasSubmitted,
+      finalElapsedMs,
+      matchStartWallTime,
+      currentRoomData
+    });
+    sessionStorage.setItem(STORAGE_KEY, payload);
+    localStorage.setItem(STORAGE_KEY, payload);
+  } catch {
+    // Ignora caso storage esteja bloqueado
+  }
+}
+
+function clearSavedSessionState() {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Ignora
+  }
+}
+
+function loadSavedSessionState() {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY) || localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || !data.roomCode || !data.playerId) return null;
+    // Expira após 3 horas
+    if (Date.now() - (data.savedAt || 0) > 3 * 60 * 60 * 1000) {
+      clearSavedSessionState();
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
 
 function generateRandomCode5() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -444,7 +502,6 @@ function initMusicPlayer() {
 
 // ==========================================
 // RENDERIZAÇÃO DOS SLIDES DE PERGUNTAS (1 A 6)
-// (Número centralizado em cima da questão)
 // ==========================================
 function renderQuestionSlides() {
   const fragment = document.createDocumentFragment();
@@ -535,6 +592,17 @@ function showSlide(slideId) {
   allSlides.forEach((card) => {
     card.classList.toggle("active", card.dataset.slide === currentSlide);
   });
+
+  saveSessionState();
+}
+
+function applySelectedOptionsToDOM() {
+  slidesContainer.querySelectorAll(".option-btn").forEach((btn) => {
+    const qNum = Number(btn.dataset.question);
+    const isSelected = userAnswers[qNum] === btn.dataset.letter;
+    btn.classList.toggle("selected", isSelected);
+    btn.setAttribute("aria-pressed", isSelected ? "true" : "false");
+  });
 }
 
 function selectOption(questionNum, letter) {
@@ -550,21 +618,21 @@ function selectOption(questionNum, letter) {
       btn.setAttribute("aria-pressed", isSelected ? "true" : "false");
     });
   }
+  saveSessionState();
 }
 
 // ==========================================
-// CRONÔMETRO DE 3 MINUTOS (NO TOPO SÓ TEMPO RESTANTE MIN:SEG; NO FINAL COM MILÉSIMOS)
+// CRONÔMETRO DE 3 MINUTOS (BASEADO EM DATE.NOW() PARA NÃO PERDER TEMPO FORA DA TELA)
 // ==========================================
-function startLocalMatchTimer() {
+function startLocalMatchTimer(existingStartWallTime) {
   stopLocalMatchTimer();
   hasSubmitted = false;
-  matchStartPerf = performance.now();
+  matchStartWallTime = existingStartWallTime || Date.now();
   timerRoomCode.textContent = roomCode || "-----";
-  timerRemainingEl.textContent = "03:00";
 
-  timerIntervalId = setInterval(() => {
+  function updateClock() {
     if (hasSubmitted) return;
-    const elapsed = Math.max(0, performance.now() - matchStartPerf);
+    const elapsed = Math.max(0, Date.now() - matchStartWallTime);
     const remaining = Math.max(0, MAX_TIME_MS - elapsed);
 
     timerRemainingEl.textContent = formatCountdownMinSec(remaining);
@@ -574,7 +642,11 @@ function startLocalMatchTimer() {
       closeConfirmModal();
       submitMatchAnswers(MAX_TIME_MS);
     }
-  }, 150);
+  }
+
+  updateClock();
+  timerIntervalId = setInterval(updateClock, 150);
+  saveSessionState();
 }
 
 function stopLocalMatchTimer() {
@@ -584,21 +656,24 @@ function stopLocalMatchTimer() {
   }
 }
 
-function startSpectatorRoomTimer() {
+function startSpectatorRoomTimer(existingStartWallTime) {
   stopSpectatorRoomTimer();
   const badge = document.getElementById("ranking-spectator-timer");
   const digits = document.getElementById("spectator-timer-digits");
   badge.style.display = "inline-flex";
-  const startPerf = performance.now();
+  const startWall = existingStartWallTime || Date.now();
 
-  spectatorTimerIntervalId = setInterval(() => {
-    const elapsed = Math.max(0, performance.now() - startPerf);
+  function updateSpecClock() {
+    const elapsed = Math.max(0, Date.now() - startWall);
     const remaining = Math.max(0, MAX_TIME_MS - elapsed);
     digits.textContent = formatCountdownMinSec(remaining);
     if (remaining <= 0) {
       stopSpectatorRoomTimer();
     }
-  }, 250);
+  }
+
+  updateSpecClock();
+  spectatorTimerIntervalId = setInterval(updateSpecClock, 250);
 }
 
 function stopSpectatorRoomTimer() {
@@ -831,7 +906,7 @@ function joinRoomP2P(code, name) {
 }
 
 // ==========================================
-// COMUNICAÇÃO EM TEMPO REAL (SERVIDOR NODE OU PEERJS FALLBACK)
+// COMUNICAÇÃO EM TEMPO REAL E RECONEXÃO AO VOLTAR PARA A TELA/ABA
 // ==========================================
 function getShareableRoomLink(code) {
   const url = new URL(window.location.href);
@@ -840,7 +915,7 @@ function getShareableRoomLink(code) {
 }
 
 function connectRoomEvents(code) {
-  if (useP2PMode) return;
+  if (useP2PMode || !code) return;
   if (eventSource) {
     eventSource.close();
     eventSource = null;
@@ -857,6 +932,62 @@ function connectRoomEvents(code) {
       // Ignora pacotes inválidos
     }
   };
+
+  eventSource.onerror = () => {
+    // Se a conexão SSE cair (ex: celular suspendeu a aba), tenta sincronizar ao voltar
+    if (eventSource && eventSource.readyState === EventSource.CLOSED) {
+      setTimeout(() => {
+        if (roomCode && !useP2PMode) {
+          syncAndRehydrateWithServer();
+        }
+      }, 2000);
+    }
+  };
+}
+
+async function syncAndRehydrateWithServer() {
+  if (!roomCode || !playerId || useP2PMode) return;
+
+  try {
+    const res = await fetch("/api/rooms/rehydrate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: roomCode,
+        playerId,
+        playerName,
+        isHost,
+        hostPlays,
+        roomStatus: currentRoomData ? currentRoomData.status : (hasSubmitted ? "playing" : "lobby"),
+        startedAt: matchStartWallTime,
+        hasSubmitted,
+        answers: userAnswers,
+        elapsedMs: finalElapsedMs,
+        cachedPlayers: currentRoomData ? currentRoomData.players : null
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.room) {
+        currentRoomData = data.room;
+        if (currentSlide === "7") {
+          renderFinalRankingAndChoices(currentRoomData);
+        } else if (currentSlide === "lobby") {
+          updateLobbyUI(currentRoomData);
+        }
+      }
+    }
+  } catch {
+    // Mantém dados locais intactos na tela
+    if (currentSlide === "7") {
+      renderFinalRankingAndChoices(currentRoomData);
+    }
+  }
+
+  if (!eventSource || eventSource.readyState === EventSource.CLOSED) {
+    connectRoomEvents(roomCode);
+  }
 }
 
 function handleRoomStateUpdate(room) {
@@ -869,15 +1000,14 @@ function handleRoomStateUpdate(room) {
 
   updateLobbyUI(room);
 
-  // Se a sala acabou de mudar de 'lobby' para 'playing'
-  if (room.status === "playing" && (currentSlide === "lobby" || prevStatus === "lobby")) {
+  // Se a sala acabou de mudar de 'lobby' para 'playing' e o jogador ainda não finalizou
+  if (room.status === "playing" && !hasSubmitted && (currentSlide === "lobby" || prevStatus === "lobby")) {
     Object.keys(userAnswers).forEach((k) => delete userAnswers[k]);
     slidesContainer.querySelectorAll(".option-btn").forEach((btn) => {
       btn.classList.remove("selected");
       btn.setAttribute("aria-pressed", "false");
     });
 
-    // Se for o dono da sala e o switch estiver desligado (apenas acompanhar o ranking)
     if (isHost && !hostPlays) {
       hasSubmitted = true;
       stopLocalMatchTimer();
@@ -893,6 +1023,9 @@ function handleRoomStateUpdate(room) {
 
   // Se o criador reiniciou a sala de volta para o Lobby
   if (room.status === "lobby" && currentSlide === "7") {
+    hasSubmitted = false;
+    finalElapsedMs = 0;
+    Object.keys(userAnswers).forEach((k) => delete userAnswers[k]);
     stopLocalMatchTimer();
     stopSpectatorRoomTimer();
     closeConfirmModal();
@@ -903,15 +1036,15 @@ function handleRoomStateUpdate(room) {
   if (currentSlide === "7") {
     renderFinalRankingAndChoices(room);
   }
+
+  saveSessionState();
 }
 
 function updateLobbyUI(room) {
   document.getElementById("lobby-room-code").textContent = room.code;
   document.getElementById("lobby-players-count").textContent = `${room.playersCount} / ${room.maxPlayers}`;
-  // Mostra apenas o link puro, sem "Link de convite:"
   document.getElementById("lobby-share-url-preview").textContent = getShareableRoomLink(room.code);
 
-  // Na lista de tripulantes, deixa apenas o emoji de coroa (👑) para quem é o dono da sala
   const grid = document.getElementById("lobby-players-grid");
   grid.innerHTML = room.players
     .map((p) => {
@@ -947,6 +1080,7 @@ async function setHostPlayMode(shouldPlay) {
   hostPlays = Boolean(shouldPlay);
   const hostPlaySwitch = document.getElementById("input-host-play-switch");
   if (hostPlaySwitch) hostPlaySwitch.checked = hostPlays;
+  saveSessionState();
 
   if (!roomCode || !playerId || !isHost) return;
 
@@ -989,7 +1123,10 @@ async function createRoom() {
   }
 
   errorEl.textContent = "";
-  const ownerPlays = true; // Padrão ligado ao criar; pode alternar no switch dentro do Lobby
+  const ownerPlays = true;
+  hasSubmitted = false;
+  finalElapsedMs = 0;
+  Object.keys(userAnswers).forEach((k) => delete userAnswers[k]);
 
   try {
     const res = await fetch("/api/rooms/create", {
@@ -1045,6 +1182,10 @@ async function joinRoom() {
   }
 
   errorEl.textContent = "";
+  hasSubmitted = false;
+  finalElapsedMs = 0;
+  Object.keys(userAnswers).forEach((k) => delete userAnswers[k]);
+
   try {
     const res = await fetch("/api/rooms/join", {
       method: "POST",
@@ -1117,12 +1258,13 @@ async function submitMatchAnswers(forcedElapsedMs) {
   const measuredElapsed =
     typeof forcedElapsedMs === "number"
       ? forcedElapsedMs
-      : matchStartPerf
-      ? Math.min(MAX_TIME_MS, Math.max(100, Math.round(performance.now() - matchStartPerf)))
+      : matchStartWallTime
+      ? Math.min(MAX_TIME_MS, Math.max(100, Math.round(Date.now() - matchStartWallTime)))
       : MAX_TIME_MS;
 
   finalElapsedMs = measuredElapsed;
   stopLocalMatchTimer();
+  saveSessionState();
 
   if (useP2PMode) {
     if (isHost && p2pRoomState) {
@@ -1158,9 +1300,13 @@ async function submitMatchAnswers(forcedElapsedMs) {
         elapsedMs: finalElapsedMs
       })
     });
-    const data = await res.json();
-    if (res.ok && data.room) {
-      currentRoomData = data.room;
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.room) {
+        currentRoomData = data.room;
+      }
+    } else if (res.status === 404) {
+      await syncAndRehydrateWithServer();
     }
   } catch {
     // Continua com resultado local
@@ -1181,62 +1327,74 @@ function renderFinalRankingAndChoices(room) {
   const localScore = calculateScoreFromAnswers(userAnswers);
   document.getElementById("ranking-room-code").textContent = roomCode || "-----";
 
-  const tbody = document.getElementById("ranking-tbody");
-  if (room && Array.isArray(room.ranking)) {
-    const finishedCount = room.ranking.filter((p) => p.finished).length;
-    document.getElementById("ranking-progress-text").textContent =
-      `${finishedCount} de ${room.playersCount} finalizaram`;
+  // Garante uma lista de ranking válida mesmo se a conexão oscilar ao sair e voltar da aba
+  let effectiveRanking =
+    room && Array.isArray(room.ranking) && room.ranking.length > 0 ? [...room.ranking] : [];
 
-    if (!isSpectatingHost) {
-      const myIndex = room.ranking.findIndex((p) => p.id === playerId);
-      const myPlayer = room.ranking[myIndex];
-
-      document.getElementById("my-rank-pos").textContent =
-        myIndex >= 0 ? `#${myIndex + 1}º` : "#1º";
-      document.getElementById("my-score-count").textContent =
-        `${myPlayer && myPlayer.finished ? myPlayer.score : localScore} / 6`;
-      document.getElementById("my-time-formatted").textContent =
-        formatMinSecMs(myPlayer && myPlayer.elapsedMs ? myPlayer.elapsedMs : finalElapsedMs);
+  if (!isSpectatingHost && playerId) {
+    const existsInRanking = effectiveRanking.some((p) => p.id === playerId);
+    if (!existsInRanking) {
+      effectiveRanking.push({
+        id: playerId,
+        name: playerName || "Você",
+        isHost,
+        finished: true,
+        score: localScore,
+        elapsedMs: finalElapsedMs || MAX_TIME_MS
+      });
     }
-
-    if (room.ranking.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="4" style="text-align:center; padding: 18px;">
-            Nenhum participante jogando nesta partida.
-          </td>
-        </tr>
-      `;
-    } else {
-      tbody.innerHTML = room.ranking
-        .map((p, idx) => {
-          const pos = `${idx + 1}º`;
-          const isMe = p.id === playerId;
-          const crown = p.isHost ? "👑 " : "";
-          const meBadge = isMe ? `<span class="me-tag">Você</span>` : "";
-          const scoreText = p.finished ? `${p.score} / 6` : "—";
-          // No Ranking Final exibe Minuto, Segundo e Milésimo para desempate
-          const timeText = p.finished ? formatMinSecMs(p.elapsedMs) : "Respondendo...";
-
-          return `
-            <tr class="${isMe ? "is-me-row" : ""}">
-              <td>${pos}</td>
-              <td>${crown}${escapeHtml(p.name)}${meBadge}</td>
-              <td>${scoreText}</td>
-              <td class="col-time">${timeText}</td>
-            </tr>
-          `;
-        })
-        .join("");
-    }
-
-    const btnBackLobby = document.getElementById("btn-back-lobby");
-    btnBackLobby.style.display = isHost ? "inline-flex" : "none";
-  } else if (!isSpectatingHost) {
-    document.getElementById("my-rank-pos").textContent = "#1º";
-    document.getElementById("my-score-count").textContent = `${localScore} / 6`;
-    document.getElementById("my-time-formatted").textContent = formatMinSecMs(finalElapsedMs);
   }
+
+  const tbody = document.getElementById("ranking-tbody");
+  const totalCount = room && room.playersCount ? room.playersCount : effectiveRanking.length;
+  const finishedCount = effectiveRanking.filter((p) => p.finished).length;
+  document.getElementById("ranking-progress-text").textContent =
+    `${finishedCount} de ${totalCount} finalizaram`;
+
+  if (!isSpectatingHost) {
+    const myIndex = effectiveRanking.findIndex((p) => p.id === playerId);
+    const myPlayer = effectiveRanking[myIndex];
+
+    document.getElementById("my-rank-pos").textContent =
+      myIndex >= 0 ? `#${myIndex + 1}º` : "#1º";
+    document.getElementById("my-score-count").textContent =
+      `${myPlayer && myPlayer.finished ? myPlayer.score : localScore} / 6`;
+    document.getElementById("my-time-formatted").textContent =
+      formatMinSecMs(myPlayer && myPlayer.elapsedMs ? myPlayer.elapsedMs : finalElapsedMs);
+  }
+
+  if (effectiveRanking.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="4" style="text-align:center; padding: 18px;">
+          Nenhum participante jogando nesta partida.
+        </td>
+      </tr>
+    `;
+  } else {
+    tbody.innerHTML = effectiveRanking
+      .map((p, idx) => {
+        const pos = `${idx + 1}º`;
+        const isMe = p.id === playerId;
+        const crown = p.isHost ? "👑 " : "";
+        const meBadge = isMe ? `<span class="me-tag">Você</span>` : "";
+        const scoreText = p.finished ? `${p.score} / 6` : "—";
+        const timeText = p.finished ? formatMinSecMs(p.elapsedMs) : "Respondendo...";
+
+        return `
+          <tr class="${isMe ? "is-me-row" : ""}">
+            <td>${pos}</td>
+            <td>${crown}${escapeHtml(p.name)}${meBadge}</td>
+            <td>${scoreText}</td>
+            <td class="col-time">${timeText}</td>
+          </tr>
+        `;
+      })
+      .join("");
+  }
+
+  const btnBackLobby = document.getElementById("btn-back-lobby");
+  btnBackLobby.style.display = isHost ? "inline-flex" : "none";
 
   if (!isSpectatingHost) {
     finalChoicesGrid.innerHTML = QUIZ_QUESTIONS.map((q) => {
@@ -1311,6 +1469,7 @@ function leaveRoomAndReset() {
   stopLocalMatchTimer();
   stopSpectatorRoomTimer();
   closeConfirmModal();
+  clearSavedSessionState();
   if (eventSource) {
     eventSource.close();
     eventSource = null;
@@ -1325,9 +1484,58 @@ function leaveRoomAndReset() {
   roomCode = null;
   currentRoomData = null;
   hasSubmitted = false;
+  finalElapsedMs = 0;
   Object.keys(userAnswers).forEach((k) => delete userAnswers[k]);
   window.history.replaceState({}, "", window.location.pathname);
   showSlide("0");
+}
+
+function restorePreviousSessionIfApplicable() {
+  const saved = loadSavedSessionState();
+  if (!saved || !saved.roomCode || saved.currentSlide === "0") return false;
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlRoom = urlParams.get("sala");
+  if (urlRoom && urlRoom.trim().toUpperCase() !== saved.roomCode) {
+    return false;
+  }
+
+  roomCode = saved.roomCode;
+  playerId = saved.playerId;
+  playerName = saved.playerName || "";
+  isHost = Boolean(saved.isHost);
+  hostPlays = saved.hostPlays !== false;
+  hasSubmitted = Boolean(saved.hasSubmitted);
+  finalElapsedMs = Number(saved.finalElapsedMs) || 0;
+  matchStartWallTime = saved.matchStartWallTime || Date.now();
+  currentRoomData = saved.currentRoomData || null;
+
+  Object.keys(userAnswers).forEach((k) => delete userAnswers[k]);
+  if (saved.userAnswers && typeof saved.userAnswers === "object") {
+    Object.assign(userAnswers, saved.userAnswers);
+  }
+
+  const nameInput = document.getElementById("input-player-name");
+  if (nameInput && playerName) nameInput.value = playerName;
+
+  applySelectedOptionsToDOM();
+
+  if (currentRoomData) {
+    updateLobbyUI(currentRoomData);
+  }
+
+  if (saved.currentSlide === "7" || hasSubmitted) {
+    renderFinalRankingAndChoices(currentRoomData);
+    showSlide("7");
+  } else if (["1", "2", "3", "4", "5", "6"].includes(String(saved.currentSlide))) {
+    startLocalMatchTimer(matchStartWallTime);
+    showSlide(String(saved.currentSlide));
+  } else if (saved.currentSlide === "lobby") {
+    showSlide("lobby");
+  }
+
+  syncAndRehydrateWithServer();
+  return true;
 }
 
 function initQuiz() {
@@ -1340,6 +1548,35 @@ function initQuiz() {
     const codeInput = document.getElementById("input-room-code");
     codeInput.value = urlRoomCode.trim().toUpperCase().slice(0, 5);
   }
+
+  // Restaura imediatamente a sessão (respostas, tempo e ranking) se a pessoa saiu e voltou da tela/aba
+  restorePreviousSessionIfApplicable();
+
+  // Quando o usuário sai da aba/aplicativo (no celular ou PC) e volta para a tela:
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && roomCode) {
+      if (currentSlide === "7") {
+        renderFinalRankingAndChoices(currentRoomData);
+      }
+      syncAndRehydrateWithServer();
+    }
+  });
+
+  window.addEventListener("focus", () => {
+    if (roomCode) {
+      if (currentSlide === "7") {
+        renderFinalRankingAndChoices(currentRoomData);
+      }
+      syncAndRehydrateWithServer();
+    }
+  });
+
+  window.addEventListener("pageshow", () => {
+    if (roomCode && currentSlide === "7") {
+      renderFinalRankingAndChoices(currentRoomData);
+      syncAndRehydrateWithServer();
+    }
+  });
 
   // Eventos do Modal de Confirmação
   btnModalCancel.addEventListener("click", closeConfirmModal);
