@@ -4,9 +4,7 @@
   "description": "Quiz Multiplayer em Tempo Real - Jornada Odisseia: sobrevivendo às mudanças",
   "main": "server.js",
   "scripts": {
+    "build": "node -e \"const fs=require('fs'); ['public','dist','build'].forEach(d=>{fs.mkdirSync(d,{recursive:true}); ['index.html','styles.css','script.js','musica.webm','musica.m4a'].forEach(f=>{if(fs.existsSync(f))fs.copyFileSync(f,d+'/'+f);});});\"",
     "start": "node server.js"
-  },
-  "engines": {
-    "node": ">=18.0.0"
   }
 }

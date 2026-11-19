@@ -74,6 +74,8 @@ const QUIZ_QUESTIONS = [
 ];
 
 const MAX_TIME_MS = 3 * 60 * 1000; // 3 minutos = 180.000 ms
+const MAX_PLAYERS = 40;
+const PEER_PREFIX = "odisseia-quiz-2026-";
 
 // Estado da Sessão e Sala Multiplayer
 let currentSlide = "0"; // '0' | 'lobby' | '1'..'6' | '7'
@@ -84,6 +86,13 @@ let playerName = "";
 let isHost = false;
 let currentRoomData = null;
 let eventSource = null;
+
+// Modo P2P (PeerJS) para funcionar perfeitamente também no Render Static Site sem banco de dados
+let useP2PMode = false;
+let peerInstance = null;
+let hostConnections = new Map(); // playerId -> DataConnection
+let guestConnection = null;
+let p2pRoomState = null;
 
 // Cronômetro de alta precisão (Minuto, Segundo e Milésimo)
 let matchStartPerf = null;
@@ -117,6 +126,19 @@ let masterVolume = 0.65;
 let isMuted = false;
 let previousVolume = 0.65;
 
+function generateRandomCode5() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 5; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
+
+function generateLocalId() {
+  return "p_" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+}
+
 /**
  * Formata milissegundos em "MMm SSs MMMms" (Minuto, Segundo e Milésimo)
  */
@@ -145,6 +167,17 @@ function formatCountdownClock(ms) {
   const sStr = String(seconds).padStart(2, "0");
   const msStr = String(millis).padStart(3, "0");
   return `${mStr}:${sStr}.${msStr}`;
+}
+
+function calculateScoreFromAnswers(ansObj) {
+  let score = 0;
+  QUIZ_QUESTIONS.forEach((q) => {
+    const chosen = String((ansObj && ansObj[q.number]) || "").toUpperCase();
+    if (chosen && chosen === q.correct) {
+      score++;
+    }
+  });
+  return score;
 }
 
 /**
@@ -520,7 +553,6 @@ function startLocalMatchTimer() {
     timerClockBox.classList.toggle("urgent", remaining <= 30000);
 
     if (remaining <= 0) {
-      // Tempo de 3 minutos esgotado -> envia respostas automaticamente
       submitMatchAnswers(MAX_TIME_MS);
       return;
     }
@@ -539,7 +571,219 @@ function stopLocalMatchTimer() {
 }
 
 // ==========================================
-// COMUNICAÇÃO EM TEMPO REAL COM O SERVIDOR (SSE + REST)
+// MOTOR P2P (PEERJS) PARA FUNCIONAR EM STATIC SITE SEM SERVIDOR NODE
+// ==========================================
+function serializeP2PRoom() {
+  if (!p2pRoomState) return null;
+  const playersList = Array.from(p2pRoomState.players.values()).map((p) => ({
+    id: p.id,
+    name: p.name,
+    isHost: p.id === p2pRoomState.hostId,
+    finished: p.finished,
+    score: p.score,
+    totalQuestions: 6,
+    elapsedMs: p.elapsedMs,
+    joinedAt: p.joinedAt
+  }));
+
+  const ranking = [...playersList].sort((a, b) => {
+    if (a.finished !== b.finished) return a.finished ? -1 : 1;
+    if (!a.finished && !b.finished) return a.joinedAt - b.joinedAt;
+    if (b.score !== a.score) return b.score - a.score;
+    return (a.elapsedMs ?? MAX_TIME_MS) - (b.elapsedMs ?? MAX_TIME_MS);
+  });
+
+  return {
+    code: p2pRoomState.code,
+    hostId: p2pRoomState.hostId,
+    status: p2pRoomState.status,
+    startedAt: p2pRoomState.startedAt,
+    maxPlayers: MAX_PLAYERS,
+    playersCount: playersList.length,
+    players: playersList,
+    ranking
+  };
+}
+
+function broadcastP2PRoom() {
+  const serialized = serializeP2PRoom();
+  if (!serialized) return;
+  const payload = { type: "room_update", room: serialized };
+  for (const conn of hostConnections.values()) {
+    try {
+      if (conn.open) conn.send(payload);
+    } catch {
+      // ignora conexões fechadas
+    }
+  }
+  handleRoomStateUpdate(serialized);
+}
+
+function createRoomP2P(name) {
+  const errorEl = document.getElementById("entry-error-msg");
+  if (typeof Peer === "undefined") {
+    errorEl.textContent = "Carregando módulo de salas... tente novamente em 1 segundo.";
+    return;
+  }
+
+  useP2PMode = true;
+  const code = generateRandomCode5();
+  const myId = generateLocalId();
+
+  if (peerInstance) {
+    peerInstance.destroy();
+  }
+
+  peerInstance = new Peer(PEER_PREFIX + code);
+
+  peerInstance.on("open", () => {
+    roomCode = code;
+    playerId = myId;
+    playerName = name;
+    isHost = true;
+
+    p2pRoomState = {
+      code,
+      hostId: myId,
+      status: "lobby",
+      startedAt: null,
+      players: new Map()
+    };
+
+    p2pRoomState.players.set(myId, {
+      id: myId,
+      name,
+      joinedAt: Date.now(),
+      finished: false,
+      score: 0,
+      elapsedMs: null,
+      answers: {}
+    });
+
+    window.history.replaceState({}, "", `?sala=${roomCode}`);
+    broadcastP2PRoom();
+    showSlide("lobby");
+  });
+
+  peerInstance.on("connection", (conn) => {
+    conn.on("data", (msg) => {
+      if (!msg || typeof msg !== "object" || !p2pRoomState) return;
+
+      if (msg.type === "join") {
+        const gId = String(msg.playerId || generateLocalId());
+        const gName = String(msg.playerName || "Tripulante").slice(0, 32);
+
+        if (!p2pRoomState.players.has(gId) && p2pRoomState.players.size >= MAX_PLAYERS) {
+          conn.send({ type: "error", error: "A sala já atingiu o limite de 40 participantes." });
+          return;
+        }
+
+        hostConnections.set(gId, conn);
+        p2pRoomState.players.set(gId, {
+          id: gId,
+          name: gName,
+          joinedAt: Date.now(),
+          finished: false,
+          score: 0,
+          elapsedMs: null,
+          answers: {}
+        });
+
+        broadcastP2PRoom();
+      } else if (msg.type === "submit") {
+        const p = p2pRoomState.players.get(msg.playerId);
+        if (p && !p.finished) {
+          p.finished = true;
+          p.answers = msg.answers || {};
+          p.score = calculateScoreFromAnswers(p.answers);
+          p.elapsedMs = Math.min(MAX_TIME_MS, Math.max(100, Number(msg.elapsedMs) || MAX_TIME_MS));
+          broadcastP2PRoom();
+        }
+      }
+    });
+  });
+
+  peerInstance.on("error", (err) => {
+    if (err && err.type === "unavailable-id") {
+      // Código colidiu, gera outro automaticamente
+      createRoomP2P(name);
+    } else {
+      errorEl.textContent = "Não foi possível criar a sala no momento. Tente novamente.";
+    }
+  });
+}
+
+function joinRoomP2P(code, name) {
+  const errorEl = document.getElementById("entry-error-msg");
+  if (typeof Peer === "undefined") {
+    errorEl.textContent = "Carregando módulo de salas... tente novamente em 1 segundo.";
+    return;
+  }
+
+  useP2PMode = true;
+  const myId = playerId || generateLocalId();
+  playerId = myId;
+  playerName = name;
+
+  if (peerInstance) {
+    peerInstance.destroy();
+  }
+
+  peerInstance = new Peer();
+
+  peerInstance.on("open", () => {
+    const conn = peerInstance.connect(PEER_PREFIX + code, { reliable: true });
+    guestConnection = conn;
+
+    const timeout = setTimeout(() => {
+      if (!currentRoomData) {
+        errorEl.textContent = "Sala não encontrada ou o criador fechou a aba.";
+      }
+    }, 6000);
+
+    conn.on("open", () => {
+      roomCode = code;
+      window.history.replaceState({}, "", `?sala=${roomCode}`);
+      conn.send({
+        type: "join",
+        playerId: myId,
+        playerName: name
+      });
+    });
+
+    conn.on("data", (msg) => {
+      clearTimeout(timeout);
+      if (!msg || typeof msg !== "object") return;
+      if (msg.type === "error") {
+        errorEl.textContent = msg.error || "Erro ao entrar na sala.";
+        return;
+      }
+      if (msg.type === "room_update" && msg.room) {
+        const wasOnCover = currentSlide === "0";
+        handleRoomStateUpdate(msg.room);
+        if (wasOnCover) {
+          if (msg.room.status === "playing") {
+            startLocalMatchTimer();
+            showSlide("1");
+          } else {
+            showSlide("lobby");
+          }
+        }
+      }
+    });
+  });
+
+  peerInstance.on("error", (err) => {
+    if (err && err.type === "peer-unavailable") {
+      errorEl.textContent = "Sala não encontrada. Verifique o código de 5 dígitos.";
+    } else {
+      errorEl.textContent = "Erro ao conectar à sala. Verifique o código.";
+    }
+  });
+}
+
+// ==========================================
+// COMUNICAÇÃO EM TEMPO REAL (SERVIDOR NODE OU PEERJS FALLBACK)
 // ==========================================
 function getShareableRoomLink(code) {
   const url = new URL(window.location.href);
@@ -548,6 +792,7 @@ function getShareableRoomLink(code) {
 }
 
 function connectRoomEvents(code) {
+  if (useP2PMode) return;
   if (eventSource) {
     eventSource.close();
     eventSource = null;
@@ -571,7 +816,6 @@ function handleRoomStateUpdate(room) {
   currentRoomData = room;
   isHost = room.hostId === playerId;
 
-  // Atualiza Lobby
   updateLobbyUI(room);
 
   // Se a sala acabou de mudar de 'lobby' para 'playing', inicia a partida para todos!
@@ -654,25 +898,32 @@ async function createRoom() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ playerName: name })
     });
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      // Hospedado como Static Site: usa modo P2P automaticamente
+      createRoomP2P(name);
+      return;
+    }
+
     const data = await res.json();
-    if (!res.ok) {
+    if (!res.ok || !data.code) {
       errorEl.textContent = data.error || "Não foi possível criar a sala.";
       return;
     }
 
+    useP2PMode = false;
     roomCode = data.code;
     playerId = data.playerId;
     playerName = name;
     isHost = true;
 
-    // Atualiza URL sem recarregar para facilitar compartilhamento
     window.history.replaceState({}, "", `?sala=${roomCode}`);
-
     handleRoomStateUpdate(data.room);
     connectRoomEvents(roomCode);
     showSlide("lobby");
   } catch {
-    errorEl.textContent = "Erro de conexão com o servidor.";
+    // Fallback automático para modo P2P se estiver em Static Site
+    createRoomP2P(name);
   }
 }
 
@@ -702,18 +953,24 @@ async function joinRoom() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, playerName: name, playerId })
     });
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      joinRoomP2P(code, name);
+      return;
+    }
+
     const data = await res.json();
-    if (!res.ok) {
+    if (!res.ok || !data.code) {
       errorEl.textContent = data.error || "Não foi possível entrar na sala.";
       return;
     }
 
+    useP2PMode = false;
     roomCode = data.code;
     playerId = data.playerId;
     playerName = name;
 
     window.history.replaceState({}, "", `?sala=${roomCode}`);
-
     handleRoomStateUpdate(data.room);
     connectRoomEvents(roomCode);
 
@@ -724,12 +981,26 @@ async function joinRoom() {
       showSlide("lobby");
     }
   } catch {
-    errorEl.textContent = "Erro de conexão com o servidor.";
+    joinRoomP2P(code, name);
   }
 }
 
 async function startMatchAsHost() {
   if (!roomCode || !playerId) return;
+
+  if (useP2PMode && p2pRoomState) {
+    p2pRoomState.status = "playing";
+    p2pRoomState.startedAt = Date.now();
+    for (const p of p2pRoomState.players.values()) {
+      p.finished = false;
+      p.score = 0;
+      p.elapsedMs = null;
+      p.answers = {};
+    }
+    broadcastP2PRoom();
+    return;
+  }
+
   try {
     await fetch("/api/rooms/start", {
       method: "POST",
@@ -755,6 +1026,29 @@ async function submitMatchAnswers(forcedElapsedMs) {
   finalElapsedMs = measuredElapsed;
   stopLocalMatchTimer();
 
+  if (useP2PMode) {
+    if (isHost && p2pRoomState) {
+      const me = p2pRoomState.players.get(playerId);
+      if (me) {
+        me.finished = true;
+        me.answers = { ...userAnswers };
+        me.score = calculateScoreFromAnswers(userAnswers);
+        me.elapsedMs = finalElapsedMs;
+      }
+      broadcastP2PRoom();
+    } else if (guestConnection && guestConnection.open) {
+      guestConnection.send({
+        type: "submit",
+        playerId,
+        answers: userAnswers,
+        elapsedMs: finalElapsedMs
+      });
+    }
+    renderFinalRankingAndChoices(currentRoomData);
+    showSlide("7");
+    return;
+  }
+
   try {
     const res = await fetch("/api/rooms/submit", {
       method: "POST",
@@ -771,7 +1065,7 @@ async function submitMatchAnswers(forcedElapsedMs) {
       currentRoomData = data.room;
     }
   } catch {
-    // Se houver oscilação, ainda mostra o resultado local
+    // Continua com resultado local
   }
 
   renderFinalRankingAndChoices(currentRoomData);
@@ -779,17 +1073,9 @@ async function submitMatchAnswers(forcedElapsedMs) {
 }
 
 function renderFinalRankingAndChoices(room) {
-  // 1. Calcula pontuação local como garantia imediata
-  let localScore = 0;
-  QUIZ_QUESTIONS.forEach((q) => {
-    if (userAnswers[q.number] === q.correct) {
-      localScore++;
-    }
-  });
-
+  const localScore = calculateScoreFromAnswers(userAnswers);
   document.getElementById("ranking-room-code").textContent = roomCode || "-----";
 
-  // 2. Atualiza Ranking da Sala
   const tbody = document.getElementById("ranking-tbody");
   if (room && Array.isArray(room.ranking)) {
     const finishedCount = room.ranking.filter((p) => p.finished).length;
@@ -834,7 +1120,6 @@ function renderFinalRankingAndChoices(room) {
     document.getElementById("my-time-formatted").textContent = formatMinSecMs(finalElapsedMs);
   }
 
-  // 3. Renderiza o Gabarito das 6 questões com verde (acertou) e vermelho (errou)
   finalChoicesGrid.innerHTML = QUIZ_QUESTIONS.map((q) => {
     const chosenLetter = userAnswers[q.number];
     const chosenOpt = q.options.find((o) => o.letter === chosenLetter);
@@ -870,6 +1155,13 @@ function leaveRoomAndReset() {
     eventSource.close();
     eventSource = null;
   }
+  if (peerInstance) {
+    peerInstance.destroy();
+    peerInstance = null;
+  }
+  hostConnections.clear();
+  guestConnection = null;
+  p2pRoomState = null;
   roomCode = null;
   currentRoomData = null;
   hasSubmitted = false;
@@ -878,14 +1170,10 @@ function leaveRoomAndReset() {
   showSlide("0");
 }
 
-// ==========================================
-// INICIALIZAÇÃO E EVENTOS
-// ==========================================
 function initQuiz() {
   renderQuestionSlides();
   initMusicPlayer();
 
-  // Se a pessoa abriu o link com ?sala=XXXXX, já preenche o código de 5 dígitos automaticamente
   const urlParams = new URLSearchParams(window.location.search);
   const urlRoomCode = urlParams.get("sala");
   if (urlRoomCode) {
@@ -893,7 +1181,6 @@ function initQuiz() {
     codeInput.value = urlRoomCode.trim().toUpperCase().slice(0, 5);
   }
 
-  // Botões de Criar e Entrar na Sala
   document.getElementById("btn-create-room").addEventListener("click", () => {
     tryAutoPlay();
     createRoom();
@@ -911,7 +1198,6 @@ function initQuiz() {
     }
   });
 
-  // Botões do Lobby: Copiar Código e Copiar Link de Convite
   const copyFeedback = document.getElementById("lobby-copy-feedback");
 
   document.getElementById("btn-copy-code").addEventListener("click", () => {
@@ -934,7 +1220,6 @@ function initQuiz() {
   document.getElementById("btn-leave-lobby").addEventListener("click", leaveRoomAndReset);
   document.getElementById("btn-start-match").addEventListener("click", startMatchAsHost);
 
-  // Eventos nos slides de perguntas (Opções e Navegação)
   slidesContainer.addEventListener("click", (e) => {
     tryAutoPlay();
 
@@ -960,11 +1245,22 @@ function initQuiz() {
     }
   });
 
-  // Botões da Tela Final
   document.getElementById("btn-restart-quiz").addEventListener("click", leaveRoomAndReset);
 
   document.getElementById("btn-back-lobby").addEventListener("click", async () => {
     if (!roomCode || !playerId) return;
+    if (useP2PMode && isHost && p2pRoomState) {
+      p2pRoomState.status = "lobby";
+      p2pRoomState.startedAt = null;
+      for (const p of p2pRoomState.players.values()) {
+        p.finished = false;
+        p.score = 0;
+        p.elapsedMs = null;
+        p.answers = {};
+      }
+      broadcastP2PRoom();
+      return;
+    }
     await fetch("/api/rooms/reset", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
