@@ -84,19 +84,21 @@ let roomCode = null;
 let playerId = null;
 let playerName = "";
 let isHost = false;
+let hostPlays = true; // Se o dono da sala vai jogar (true) ou só acompanhar o ranking (false)
 let currentRoomData = null;
 let eventSource = null;
 
-// Modo P2P (PeerJS) para funcionar perfeitamente também no Render Static Site sem banco de dados
+// Modo P2P (PeerJS) para fallback em Static Site
 let useP2PMode = false;
 let peerInstance = null;
-let hostConnections = new Map(); // playerId -> DataConnection
+let hostConnections = new Map();
 let guestConnection = null;
 let p2pRoomState = null;
 
-// Cronômetro de alta precisão (Minuto, Segundo e Milésimo)
+// Cronômetro de alta precisão (internamente mede milésimos; no topo exibe só Min:Seg)
 let matchStartPerf = null;
-let timerRafId = null;
+let timerIntervalId = null;
+let spectatorTimerIntervalId = null;
 let hasSubmitted = false;
 let finalElapsedMs = 0;
 
@@ -109,6 +111,14 @@ const timerRoomCode = document.getElementById("timer-room-code");
 const timerClockBox = document.getElementById("timer-clock-box");
 const timerRemainingEl = document.getElementById("timer-remaining");
 const timerElapsedEl = document.getElementById("timer-elapsed");
+
+// Elementos do Modal de Confirmação
+const confirmModal = document.getElementById("confirm-modal");
+const confirmModalTitle = document.getElementById("confirm-modal-title");
+const confirmModalText = document.getElementById("confirm-modal-text");
+const btnModalCancel = document.getElementById("btn-modal-cancel");
+const btnModalConfirm = document.getElementById("btn-modal-confirm");
+let modalConfirmCallback = null;
 
 // Elementos de Áudio
 const bgMusic = document.getElementById("bg-music");
@@ -140,7 +150,7 @@ function generateLocalId() {
 }
 
 /**
- * Formata milissegundos em "MMm SSs MMMms" (Minuto, Segundo e Milésimo)
+ * Formata milissegundos em "MMm SSs MMMms" (para o Ranking Final, com milésimos para desempate)
  */
 function formatMinSecMs(ms) {
   const clamped = Math.max(0, Math.round(ms));
@@ -155,18 +165,23 @@ function formatMinSecMs(ms) {
 }
 
 /**
- * Formata milissegundos para o relógio regressivo "MM:SS.mmm"
+ * Formata milissegundos em "MMm SSs" (sem milésimos para a barra do topo)
  */
-function formatCountdownClock(ms) {
-  const clamped = Math.max(0, Math.round(ms));
-  const minutes = Math.floor(clamped / 60000);
-  const seconds = Math.floor((clamped % 60000) / 1000);
-  const millis = clamped % 1000;
+function formatMinSecOnly(ms) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSec / 60);
+  const seconds = totalSec % 60;
+  return `${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+}
 
-  const mStr = String(minutes).padStart(2, "0");
-  const sStr = String(seconds).padStart(2, "0");
-  const msStr = String(millis).padStart(3, "0");
-  return `${mStr}:${sStr}.${msStr}`;
+/**
+ * Formata milissegundos para o relógio regressivo do topo "MM:SS" (sem milésimos)
+ */
+function formatCountdownMinSec(ms) {
+  const totalSec = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSec / 60);
+  const seconds = totalSec % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 function calculateScoreFromAnswers(ansObj) {
@@ -180,9 +195,26 @@ function calculateScoreFromAnswers(ansObj) {
   return score;
 }
 
-/**
- * Gera som realista das ondas do mar e do barco velejando
- */
+// ==========================================
+// MODAL DE CONFIRMAÇÃO PERSONALIZADO
+// ==========================================
+function openConfirmModal({ title, text, cancelLabel = "Voltar", confirmLabel = "Confirmar", onConfirm }) {
+  confirmModalTitle.textContent = title;
+  confirmModalText.textContent = text;
+  btnModalCancel.textContent = cancelLabel;
+  btnModalConfirm.textContent = confirmLabel;
+  modalConfirmCallback = onConfirm;
+  confirmModal.style.display = "flex";
+}
+
+function closeConfirmModal() {
+  confirmModal.style.display = "none";
+  modalConfirmCallback = null;
+}
+
+// ==========================================
+// SOM DO MAR E MÚSICA DE FUNDO
+// ==========================================
 function createSeaWavesAmbienceUrl() {
   const sampleRate = 22050;
   const durationSeconds = 16;
@@ -535,50 +567,75 @@ function selectOption(questionNum, letter) {
 }
 
 // ==========================================
-// CRONÔMETRO DE 3 MINUTOS COM PRECISÃO DE MILÉSIMOS
+// CRONÔMETRO DE 3 MINUTOS (NO TOPO SÓ MIN:SEG, NO FINAL COM MILÉSIMOS)
 // ==========================================
 function startLocalMatchTimer() {
   stopLocalMatchTimer();
   hasSubmitted = false;
   matchStartPerf = performance.now();
   timerRoomCode.textContent = roomCode || "-----";
+  timerRemainingEl.textContent = "03:00";
+  timerElapsedEl.textContent = "00m 00s";
 
-  function tick() {
+  timerIntervalId = setInterval(() => {
     if (hasSubmitted) return;
     const elapsed = Math.max(0, performance.now() - matchStartPerf);
     const remaining = Math.max(0, MAX_TIME_MS - elapsed);
 
-    timerRemainingEl.textContent = formatCountdownClock(remaining);
-    timerElapsedEl.textContent = formatMinSecMs(elapsed);
+    timerRemainingEl.textContent = formatCountdownMinSec(remaining);
+    timerElapsedEl.textContent = formatMinSecOnly(elapsed);
     timerClockBox.classList.toggle("urgent", remaining <= 30000);
 
     if (remaining <= 0) {
+      closeConfirmModal();
       submitMatchAnswers(MAX_TIME_MS);
-      return;
     }
-
-    timerRafId = requestAnimationFrame(tick);
-  }
-
-  timerRafId = requestAnimationFrame(tick);
+  }, 150);
 }
 
 function stopLocalMatchTimer() {
-  if (timerRafId) {
-    cancelAnimationFrame(timerRafId);
-    timerRafId = null;
+  if (timerIntervalId) {
+    clearInterval(timerIntervalId);
+    timerIntervalId = null;
   }
 }
 
+function startSpectatorRoomTimer() {
+  stopSpectatorRoomTimer();
+  const badge = document.getElementById("ranking-spectator-timer");
+  const digits = document.getElementById("spectator-timer-digits");
+  badge.style.display = "inline-flex";
+  const startPerf = performance.now();
+
+  spectatorTimerIntervalId = setInterval(() => {
+    const elapsed = Math.max(0, performance.now() - startPerf);
+    const remaining = Math.max(0, MAX_TIME_MS - elapsed);
+    digits.textContent = formatCountdownMinSec(remaining);
+    if (remaining <= 0) {
+      stopSpectatorRoomTimer();
+    }
+  }, 250);
+}
+
+function stopSpectatorRoomTimer() {
+  if (spectatorTimerIntervalId) {
+    clearInterval(spectatorTimerIntervalId);
+    spectatorTimerIntervalId = null;
+  }
+  const badge = document.getElementById("ranking-spectator-timer");
+  if (badge) badge.style.display = "none";
+}
+
 // ==========================================
-// MOTOR P2P (PEERJS) PARA FUNCIONAR EM STATIC SITE SEM SERVIDOR NODE
+// MOTOR P2P (PEERJS) PARA FALLBACK EM STATIC SITE
 // ==========================================
 function serializeP2PRoom() {
   if (!p2pRoomState) return null;
-  const playersList = Array.from(p2pRoomState.players.values()).map((p) => ({
+  const allUsers = Array.from(p2pRoomState.players.values()).map((p) => ({
     id: p.id,
     name: p.name,
     isHost: p.id === p2pRoomState.hostId,
+    isSpectator: Boolean(p.isSpectator),
     finished: p.finished,
     score: p.score,
     totalQuestions: 6,
@@ -586,7 +643,9 @@ function serializeP2PRoom() {
     joinedAt: p.joinedAt
   }));
 
-  const ranking = [...playersList].sort((a, b) => {
+  const activePlayers = allUsers.filter((p) => !p.isSpectator);
+
+  const ranking = [...activePlayers].sort((a, b) => {
     if (a.finished !== b.finished) return a.finished ? -1 : 1;
     if (!a.finished && !b.finished) return a.joinedAt - b.joinedAt;
     if (b.score !== a.score) return b.score - a.score;
@@ -596,11 +655,12 @@ function serializeP2PRoom() {
   return {
     code: p2pRoomState.code,
     hostId: p2pRoomState.hostId,
+    hostPlays: p2pRoomState.hostPlays,
     status: p2pRoomState.status,
     startedAt: p2pRoomState.startedAt,
     maxPlayers: MAX_PLAYERS,
-    playersCount: playersList.length,
-    players: playersList,
+    playersCount: activePlayers.length,
+    players: allUsers,
     ranking
   };
 }
@@ -619,7 +679,7 @@ function broadcastP2PRoom() {
   handleRoomStateUpdate(serialized);
 }
 
-function createRoomP2P(name) {
+function createRoomP2P(name, ownerPlays) {
   const errorEl = document.getElementById("entry-error-msg");
   if (typeof Peer === "undefined") {
     errorEl.textContent = "Carregando módulo de salas... tente novamente em 1 segundo.";
@@ -641,10 +701,12 @@ function createRoomP2P(name) {
     playerId = myId;
     playerName = name;
     isHost = true;
+    hostPlays = ownerPlays;
 
     p2pRoomState = {
       code,
       hostId: myId,
+      hostPlays: ownerPlays,
       status: "lobby",
       startedAt: null,
       players: new Map()
@@ -653,6 +715,7 @@ function createRoomP2P(name) {
     p2pRoomState.players.set(myId, {
       id: myId,
       name,
+      isSpectator: !ownerPlays,
       joinedAt: Date.now(),
       finished: false,
       score: 0,
@@ -673,7 +736,8 @@ function createRoomP2P(name) {
         const gId = String(msg.playerId || generateLocalId());
         const gName = String(msg.playerName || "Tripulante").slice(0, 32);
 
-        if (!p2pRoomState.players.has(gId) && p2pRoomState.players.size >= MAX_PLAYERS) {
+        const activeCount = Array.from(p2pRoomState.players.values()).filter((p) => !p.isSpectator).length;
+        if (!p2pRoomState.players.has(gId) && activeCount >= MAX_PLAYERS) {
           conn.send({ type: "error", error: "A sala já atingiu o limite de 40 participantes." });
           return;
         }
@@ -682,6 +746,7 @@ function createRoomP2P(name) {
         p2pRoomState.players.set(gId, {
           id: gId,
           name: gName,
+          isSpectator: false,
           joinedAt: Date.now(),
           finished: false,
           score: 0,
@@ -692,7 +757,7 @@ function createRoomP2P(name) {
         broadcastP2PRoom();
       } else if (msg.type === "submit") {
         const p = p2pRoomState.players.get(msg.playerId);
-        if (p && !p.finished) {
+        if (p && !p.finished && !p.isSpectator) {
           p.finished = true;
           p.answers = msg.answers || {};
           p.score = calculateScoreFromAnswers(p.answers);
@@ -705,8 +770,7 @@ function createRoomP2P(name) {
 
   peerInstance.on("error", (err) => {
     if (err && err.type === "unavailable-id") {
-      // Código colidiu, gera outro automaticamente
-      createRoomP2P(name);
+      createRoomP2P(name, ownerPlays);
     } else {
       errorEl.textContent = "Não foi possível criar a sala no momento. Tente novamente.";
     }
@@ -815,16 +879,29 @@ function handleRoomStateUpdate(room) {
   const prevStatus = currentRoomData ? currentRoomData.status : null;
   currentRoomData = room;
   isHost = room.hostId === playerId;
+  if (typeof room.hostPlays === "boolean") {
+    hostPlays = room.hostPlays;
+  }
 
   updateLobbyUI(room);
 
-  // Se a sala acabou de mudar de 'lobby' para 'playing', inicia a partida para todos!
+  // Se a sala acabou de mudar de 'lobby' para 'playing'
   if (room.status === "playing" && (currentSlide === "lobby" || prevStatus === "lobby")) {
     Object.keys(userAnswers).forEach((k) => delete userAnswers[k]);
     slidesContainer.querySelectorAll(".option-btn").forEach((btn) => {
       btn.classList.remove("selected");
       btn.setAttribute("aria-pressed", "false");
     });
+
+    // Se for o dono da sala e escolheu NÃO jogar (apenas acompanhar o ranking)
+    if (isHost && !hostPlays) {
+      hasSubmitted = true;
+      stopLocalMatchTimer();
+      startSpectatorRoomTimer();
+      renderFinalRankingAndChoices(room);
+      showSlide("7");
+      return;
+    }
 
     startLocalMatchTimer();
     showSlide("1");
@@ -833,10 +910,12 @@ function handleRoomStateUpdate(room) {
   // Se o criador reiniciou a sala de volta para o Lobby
   if (room.status === "lobby" && currentSlide === "7") {
     stopLocalMatchTimer();
+    stopSpectatorRoomTimer();
+    closeConfirmModal();
     showSlide("lobby");
   }
 
-  // Se o jogador já está na tela final (7), atualiza o Ranking Ao Vivo
+  // Se o jogador/organizador já está na tela final (7), atualiza o Ranking Ao Vivo
   if (currentSlide === "7") {
     renderFinalRankingAndChoices(room);
   }
@@ -853,22 +932,56 @@ function updateLobbyUI(room) {
       const isMe = p.id === playerId;
       const crown = p.isHost ? "👑 " : "⚓ ";
       const meLabel = isMe ? " (Você)" : "";
+      const specLabel = p.isSpectator ? " — Só acompanhando" : "";
       return `
-        <div class="lobby-player-chip ${isMe ? "is-me" : ""}">
-          <span>${crown}${escapeHtml(p.name)}${meLabel}</span>
+        <div class="lobby-player-chip ${isMe ? "is-me" : ""} ${p.isSpectator ? "is-spectator" : ""}">
+          <span>${crown}${escapeHtml(p.name)}${meLabel}${specLabel}</span>
         </div>
       `;
     })
     .join("");
 
+  const hostModeBar = document.getElementById("lobby-host-mode-bar");
+  const btnModePlay = document.getElementById("btn-mode-play");
+  const btnModeSpectate = document.getElementById("btn-mode-spectate");
   const hostControls = document.getElementById("lobby-host-controls");
   const guestWaiting = document.getElementById("lobby-guest-waiting");
+
   if (isHost) {
+    hostModeBar.style.display = "flex";
+    btnModePlay.classList.toggle("active", hostPlays);
+    btnModeSpectate.classList.toggle("active", !hostPlays);
     hostControls.style.display = "block";
     guestWaiting.style.display = "none";
   } else {
+    hostModeBar.style.display = "none";
     hostControls.style.display = "none";
     guestWaiting.style.display = "block";
+  }
+}
+
+async function setHostPlayMode(shouldPlay) {
+  hostPlays = Boolean(shouldPlay);
+  document.getElementById("check-host-plays").checked = hostPlays;
+
+  if (!roomCode || !playerId || !isHost) return;
+
+  if (useP2PMode && p2pRoomState) {
+    p2pRoomState.hostPlays = hostPlays;
+    const hp = p2pRoomState.players.get(playerId);
+    if (hp) hp.isSpectator = !hostPlays;
+    broadcastP2PRoom();
+    return;
+  }
+
+  try {
+    await fetch("/api/rooms/host-mode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: roomCode, playerId, hostPlays })
+    });
+  } catch {
+    // atualizado via SSE
   }
 }
 
@@ -882,8 +995,10 @@ function escapeHtml(str) {
 
 async function createRoom() {
   const nameInput = document.getElementById("input-player-name");
+  const hostPlaysCheckbox = document.getElementById("check-host-plays");
   const errorEl = document.getElementById("entry-error-msg");
   const name = nameInput.value.trim();
+  const ownerPlays = hostPlaysCheckbox ? hostPlaysCheckbox.checked : true;
 
   if (!name) {
     errorEl.textContent = "Por favor, digite seu nome antes de criar a sala.";
@@ -896,12 +1011,11 @@ async function createRoom() {
     const res = await fetch("/api/rooms/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerName: name })
+      body: JSON.stringify({ playerName: name, hostPlays: ownerPlays })
     });
     const contentType = res.headers.get("content-type") || "";
     if (!contentType.includes("application/json")) {
-      // Hospedado como Static Site: usa modo P2P automaticamente
-      createRoomP2P(name);
+      createRoomP2P(name, ownerPlays);
       return;
     }
 
@@ -916,14 +1030,14 @@ async function createRoom() {
     playerId = data.playerId;
     playerName = name;
     isHost = true;
+    hostPlays = ownerPlays;
 
     window.history.replaceState({}, "", `?sala=${roomCode}`);
     handleRoomStateUpdate(data.room);
     connectRoomEvents(roomCode);
     showSlide("lobby");
   } catch {
-    // Fallback automático para modo P2P se estiver em Static Site
-    createRoomP2P(name);
+    createRoomP2P(name, ownerPlays);
   }
 }
 
@@ -1005,7 +1119,7 @@ async function startMatchAsHost() {
     await fetch("/api/rooms/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: roomCode, playerId })
+      body: JSON.stringify({ code: roomCode, playerId, hostPlays })
     });
   } catch {
     // Tratado via SSE
@@ -1029,7 +1143,7 @@ async function submitMatchAnswers(forcedElapsedMs) {
   if (useP2PMode) {
     if (isHost && p2pRoomState) {
       const me = p2pRoomState.players.get(playerId);
-      if (me) {
+      if (me && !me.isSpectator) {
         me.finished = true;
         me.answers = { ...userAnswers };
         me.score = calculateScoreFromAnswers(userAnswers);
@@ -1073,6 +1187,14 @@ async function submitMatchAnswers(forcedElapsedMs) {
 }
 
 function renderFinalRankingAndChoices(room) {
+  const isSpectatingHost = isHost && !hostPlays;
+  const myScoreSummary = document.getElementById("my-score-summary");
+  const finalChoicesBox = document.getElementById("final-choices-box");
+
+  // Se o dono escolheu apenas acompanhar o ranking, oculta as caixas de resposta individual dele
+  myScoreSummary.style.display = isSpectatingHost ? "none" : "grid";
+  finalChoicesBox.style.display = isSpectatingHost ? "none" : "block";
+
   const localScore = calculateScoreFromAnswers(userAnswers);
   document.getElementById("ranking-room-code").textContent = roomCode || "-----";
 
@@ -1082,75 +1204,130 @@ function renderFinalRankingAndChoices(room) {
     document.getElementById("ranking-progress-text").textContent =
       `${finishedCount} de ${room.playersCount} finalizaram`;
 
-    const myIndex = room.ranking.findIndex((p) => p.id === playerId);
-    const myPlayer = room.ranking[myIndex];
+    if (!isSpectatingHost) {
+      const myIndex = room.ranking.findIndex((p) => p.id === playerId);
+      const myPlayer = room.ranking[myIndex];
 
-    document.getElementById("my-rank-pos").textContent =
-      myIndex >= 0 ? `#${myIndex + 1}º` : "#1º";
-    document.getElementById("my-score-count").textContent =
-      `${myPlayer && myPlayer.finished ? myPlayer.score : localScore} / 6`;
-    document.getElementById("my-time-formatted").textContent =
-      formatMinSecMs(myPlayer && myPlayer.elapsedMs ? myPlayer.elapsedMs : finalElapsedMs);
+      document.getElementById("my-rank-pos").textContent =
+        myIndex >= 0 ? `#${myIndex + 1}º` : "#1º";
+      document.getElementById("my-score-count").textContent =
+        `${myPlayer && myPlayer.finished ? myPlayer.score : localScore} / 6`;
+      document.getElementById("my-time-formatted").textContent =
+        formatMinSecMs(myPlayer && myPlayer.elapsedMs ? myPlayer.elapsedMs : finalElapsedMs);
+    }
 
-    tbody.innerHTML = room.ranking
-      .map((p, idx) => {
-        const pos = idx + 1;
-        const medal = pos === 1 ? "🥇 1º" : pos === 2 ? "🥈 2º" : pos === 3 ? "🥉 3º" : `${pos}º`;
-        const isMe = p.id === playerId;
-        const meBadge = isMe ? `<span class="me-tag">Você</span>` : "";
-        const scoreText = p.finished ? `${p.score} / 6` : "—";
-        const timeText = p.finished ? formatMinSecMs(p.elapsedMs) : "⏳ Respondendo...";
+    if (room.ranking.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="4" style="text-align:center; padding: 18px;">
+            Nenhum participante jogando nesta partida.
+          </td>
+        </tr>
+      `;
+    } else {
+      tbody.innerHTML = room.ranking
+        .map((p, idx) => {
+          const pos = idx + 1;
+          const medal = pos === 1 ? "🥇 1º" : pos === 2 ? "🥈 2º" : pos === 3 ? "🥉 3º" : `${pos}º`;
+          const isMe = p.id === playerId;
+          const meBadge = isMe ? `<span class="me-tag">Você</span>` : "";
+          const scoreText = p.finished ? `${p.score} / 6` : "—";
+          // No Ranking Final exibe Minuto, Segundo e Milésimo para desempate!
+          const timeText = p.finished ? formatMinSecMs(p.elapsedMs) : "⏳ Respondendo...";
 
-        return `
-          <tr class="${isMe ? "is-me-row" : ""}">
-            <td>${medal}</td>
-            <td>${escapeHtml(p.name)}${meBadge}</td>
-            <td>${scoreText}</td>
-            <td>${timeText}</td>
-          </tr>
-        `;
-      })
-      .join("");
+          return `
+            <tr class="${isMe ? "is-me-row" : ""}">
+              <td>${medal}</td>
+              <td>${escapeHtml(p.name)}${meBadge}</td>
+              <td>${scoreText}</td>
+              <td class="col-time">${timeText}</td>
+            </tr>
+          `;
+        })
+        .join("");
+    }
 
     const btnBackLobby = document.getElementById("btn-back-lobby");
     btnBackLobby.style.display = isHost ? "inline-flex" : "none";
-  } else {
+  } else if (!isSpectatingHost) {
     document.getElementById("my-rank-pos").textContent = "#1º";
     document.getElementById("my-score-count").textContent = `${localScore} / 6`;
     document.getElementById("my-time-formatted").textContent = formatMinSecMs(finalElapsedMs);
   }
 
-  finalChoicesGrid.innerHTML = QUIZ_QUESTIONS.map((q) => {
-    const chosenLetter = userAnswers[q.number];
-    const chosenOpt = q.options.find((o) => o.letter === chosenLetter);
-    const correctOpt = q.options.find((o) => o.letter === q.correct);
-    const isCorrect = chosenLetter === q.correct;
+  if (!isSpectatingHost) {
+    finalChoicesGrid.innerHTML = QUIZ_QUESTIONS.map((q) => {
+      const chosenLetter = userAnswers[q.number];
+      const chosenOpt = q.options.find((o) => o.letter === chosenLetter);
+      const correctOpt = q.options.find((o) => o.letter === q.correct);
+      const isCorrect = chosenLetter === q.correct;
 
-    const answerHtml = chosenOpt
-      ? `<span class="choice-a-letter">${chosenOpt.letter}</span><span>${chosenOpt.text}</span>`
-      : `<span class="choice-a-letter">?</span><span><em>Não respondida</em></span>`;
+      const answerHtml = chosenOpt
+        ? `<span class="choice-a-letter">${chosenOpt.letter}</span><span>${chosenOpt.text}</span>`
+        : `<span class="choice-a-letter">?</span><span><em>Não respondida</em></span>`;
 
-    const correctHintHtml = !isCorrect && correctOpt
-      ? `<div class="choice-correct-hint">✓ Correta: <strong>${correctOpt.letter})</strong> ${correctOpt.text}</div>`
-      : `<div class="choice-correct-hint">✓ Você acertou!</div>`;
+      const correctHintHtml = !isCorrect && correctOpt
+        ? `<div class="choice-correct-hint">✓ Correta: <strong>${correctOpt.letter})</strong> ${correctOpt.text}</div>`
+        : `<div class="choice-correct-hint">✓ Você acertou!</div>`;
 
-    return `
-      <div class="choice-item ${isCorrect ? "is-correct" : "is-wrong"}">
-        <div class="choice-q">
-          <span class="choice-q-num">${q.number}</span>
-          <span>${q.question}</span>
+      return `
+        <div class="choice-item ${isCorrect ? "is-correct" : "is-wrong"}">
+          <div class="choice-q">
+            <span class="choice-q-num">${q.number}</span>
+            <span>${q.question}</span>
+          </div>
+          <div class="choice-a">
+            ${answerHtml}
+          </div>
+          ${correctHintHtml}
         </div>
-        <div class="choice-a">
-          ${answerHtml}
-        </div>
-        ${correctHintHtml}
-      </div>
-    `;
-  }).join("");
+      `;
+    }).join("");
+  }
+}
+
+function handleNextQuestionRequest(fromQuestionNum) {
+  const hasAnswer = Boolean(userAnswers[fromQuestionNum]);
+  if (!hasAnswer) {
+    openConfirmModal({
+      title: `Questão ${fromQuestionNum} em branco`,
+      text: `Você ainda não selecionou nenhuma resposta na Questão ${fromQuestionNum}. Deseja avançar para a próxima questão sem responder?`,
+      cancelLabel: "Voltar e Responder",
+      confirmLabel: "Avançar sem Responder →",
+      onConfirm: () => {
+        showSlide(String(fromQuestionNum + 1));
+      }
+    });
+  } else {
+    showSlide(String(fromQuestionNum + 1));
+  }
+}
+
+function handleFinishMatchRequest() {
+  const answeredNumbers = QUIZ_QUESTIONS.filter((q) => Boolean(userAnswers[q.number])).map((q) => q.number);
+  const unansweredNumbers = QUIZ_QUESTIONS.filter((q) => !userAnswers[q.number]).map((q) => q.number);
+  const answeredCount = answeredNumbers.length;
+
+  const extraWarning =
+    unansweredNumbers.length > 0
+      ? ` Atenção: você deixou a(s) questão(ões) ${unansweredNumbers.join(", ")} sem resposta.`
+      : " Todas as questões foram respondidas!";
+
+  openConfirmModal({
+    title: "Confirmar Finalização?",
+    text: `Você respondeu ${answeredCount} de 6 perguntas.${extraWarning} Tem certeza de que deseja finalizar e enviar suas respostas?`,
+    cancelLabel: "Revisar Questões",
+    confirmLabel: "✓ Sim, Finalizar Agora",
+    onConfirm: () => {
+      submitMatchAnswers();
+    }
+  });
 }
 
 function leaveRoomAndReset() {
   stopLocalMatchTimer();
+  stopSpectatorRoomTimer();
+  closeConfirmModal();
   if (eventSource) {
     eventSource.close();
     eventSource = null;
@@ -1181,6 +1358,15 @@ function initQuiz() {
     codeInput.value = urlRoomCode.trim().toUpperCase().slice(0, 5);
   }
 
+  // Eventos do Modal de Confirmação
+  btnModalCancel.addEventListener("click", closeConfirmModal);
+  btnModalConfirm.addEventListener("click", () => {
+    const cb = modalConfirmCallback;
+    closeConfirmModal();
+    if (typeof cb === "function") cb();
+  });
+
+  // Botões de Criar e Entrar na Sala
   document.getElementById("btn-create-room").addEventListener("click", () => {
     tryAutoPlay();
     createRoom();
@@ -1197,6 +1383,10 @@ function initQuiz() {
       joinRoom();
     }
   });
+
+  // Toggle no Lobby: Dono da sala joga ou só acompanha
+  document.getElementById("btn-mode-play").addEventListener("click", () => setHostPlayMode(true));
+  document.getElementById("btn-mode-spectate").addEventListener("click", () => setHostPlayMode(false));
 
   const copyFeedback = document.getElementById("lobby-copy-feedback");
 
@@ -1238,9 +1428,9 @@ function initQuiz() {
       if (action === "prev" && from > 1) {
         showSlide(String(from - 1));
       } else if (action === "next" && from < 6) {
-        showSlide(String(from + 1));
+        handleNextQuestionRequest(from);
       } else if (action === "finish") {
-        submitMatchAnswers();
+        handleFinishMatchRequest();
       }
     }
   });

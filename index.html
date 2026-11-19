@@ -4,10 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Jornada Odisseia: sobrevivendo às mudanças</title>
-  <!-- Google Fonts: Fredoka & Nunito -->
+  <!-- Google Fonts: Fredoka, Nunito & JetBrains Mono (para números do relógio fixos sem mexer) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=JetBrains+Mono:wght@700;800&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -146,7 +146,7 @@
       </div>
     </header>
 
-    <!-- Barra de Cronômetro de 3 Minutos (Visível durante as questões 1 a 6) -->
+    <!-- Barra de Cronômetro de 3 Minutos no Topo (Apenas Minuto e Segundo, com largura fixa sem mexer) -->
     <div class="timer-topbar" id="timer-topbar" aria-live="polite">
       <div class="timer-room-badge">
         <span>Sala:</span>
@@ -154,11 +154,11 @@
       </div>
       <div class="timer-clock-box" id="timer-clock-box">
         <span class="timer-label">⏱️ Tempo Restante:</span>
-        <span class="timer-digits" id="timer-remaining">03:00.000</span>
+        <span class="timer-digits" id="timer-remaining">03:00</span>
       </div>
       <div class="timer-elapsed-box">
         <span>Seu tempo:</span>
-        <strong id="timer-elapsed">00m 00s 000ms</strong>
+        <strong class="timer-elapsed-digits" id="timer-elapsed">00m 00s</strong>
       </div>
     </div>
 
@@ -218,7 +218,11 @@
                 <!-- Coluna 1: Criar Nova Sala -->
                 <div class="entry-box">
                   <div class="entry-box-title">Criar Nova Sala</div>
-                  <p class="entry-box-desc">Gere um código de 5 dígitos e convide até 40 pessoas para o lobby.</p>
+                  <label class="host-mode-checkbox">
+                    <input type="checkbox" id="check-host-plays" checked />
+                    <span>Quero jogar junto na partida</span>
+                  </label>
+                  <span class="host-mode-subhint">(Desmarque se quiser apenas acompanhar o Ranking)</span>
                   <button type="button" class="btn-entry-primary" id="btn-create-room">
                     <span>⚓ Criar Sala</span>
                   </button>
@@ -227,6 +231,7 @@
                 <!-- Coluna 2: Entrar em Sala com Código de 5 dígitos -->
                 <div class="entry-box">
                   <div class="entry-box-title">Entrar em uma Sala</div>
+                  <p class="entry-box-desc">Digite o código de 5 dígitos ou abra pelo link de convite:</p>
                   <div class="join-code-row">
                     <input
                       type="text"
@@ -247,7 +252,7 @@
             </div>
           </div>
 
-          <!-- Cena Unificada da Capa: Barco à esquerda na onda + Tracejado passando por cima + Bússola à direita -->
+          <!-- Cena Unificada da Capa -->
           <div class="cover-scene">
             <svg class="cover-map-svg" viewBox="0 0 1000 220" fill="none" aria-hidden="true">
               <path
@@ -295,12 +300,25 @@
 
               <div class="lobby-share-url-preview" id="lobby-share-url-preview"></div>
               <div class="lobby-copy-feedback" id="lobby-copy-feedback" aria-live="polite"></div>
+
+              <!-- Opção no Lobby para o Dono da Sala escolher se vai jogar ou só acompanhar o Ranking -->
+              <div class="lobby-host-mode-bar" id="lobby-host-mode-bar" style="display: none;">
+                <span class="host-mode-bar-label">👑 Seu modo como dono da sala:</span>
+                <div class="host-mode-toggle-group">
+                  <button type="button" class="btn-host-mode active" id="btn-mode-play" data-play="true">
+                    🎮 Jogar Junto
+                  </button>
+                  <button type="button" class="btn-host-mode" id="btn-mode-spectate" data-play="false">
+                    👀 Só Acompanhar o Ranking
+                  </button>
+                </div>
+              </div>
             </div>
 
             <!-- Lista Ao Vivo de Participantes na Sala -->
             <div class="lobby-players-card">
               <div class="lobby-players-header">
-                <h3>Tripulantes na Sala</h3>
+                <h3>Tripulantes que vão jogar</h3>
                 <span class="lobby-count-pill" id="lobby-players-count">1 / 40</span>
               </div>
 
@@ -380,7 +398,7 @@
                 </div>
               </div>
 
-              <!-- Resumo Individual do Jogador (Acertos + Tempo Exato em Min:Seg.Milésimo) -->
+              <!-- Resumo Individual do Jogador (Ocultado quando o dono escolhe só acompanhar) -->
               <div class="my-score-summary" id="my-score-summary">
                 <div class="score-pill">
                   <span class="score-pill-label">Sua Posição</span>
@@ -391,16 +409,21 @@
                   <strong class="score-pill-value" id="my-score-count">0 / 6</strong>
                 </div>
                 <div class="score-pill">
-                  <span class="score-pill-label">Seu Tempo (Min : Seg . Milésimos)</span>
+                  <span class="score-pill-label">Seu Tempo (Min / Seg / Milésimos)</span>
                   <strong class="score-pill-value" id="my-time-formatted">00m 00s 000ms</strong>
                 </div>
               </div>
 
-              <!-- RANKING AO VIVO DA SALA (ATÉ 40 JOGADORES) -->
+              <!-- RANKING AO VIVO DA SALA (ATÉ 40 JOGADORES - COM MILÉSIMOS PARA DESEMPATE) -->
               <div class="ranking-card">
                 <div class="ranking-header">
                   <h3>🏆 Ranking da Sala (<span id="ranking-room-code">-----</span>)</h3>
-                  <span class="ranking-status-badge" id="ranking-progress-text">Ao Vivo</span>
+                  <div class="ranking-header-badges">
+                    <span class="ranking-spectator-timer" id="ranking-spectator-timer" style="display: none;">
+                      ⏱️ Tempo da partida: <strong id="spectator-timer-digits">03:00</strong>
+                    </span>
+                    <span class="ranking-status-badge" id="ranking-progress-text">Ao Vivo</span>
+                  </div>
                 </div>
 
                 <div class="ranking-table-wrap">
@@ -419,8 +442,8 @@
               </div>
 
               <!-- Suas Respostas e Gabarito das 6 Questões -->
-              <div class="final-choices-box">
-                <h3 class="final-choices-title">Gabarito e suas respostas na jornada:</h3>
+              <div class="final-choices-box" id="final-choices-box">
+                <h3 class="final-choices-title" id="final-choices-title">Gabarito e suas respostas na jornada:</h3>
                 <div class="final-choices-grid" id="final-choices-grid"></div>
               </div>
 
@@ -449,6 +472,18 @@
 
       </div>
     </main>
+  </div>
+
+  <!-- Modal de Confirmação Personalizado (Avançar sem responder / Confirmar Finalização) -->
+  <div class="confirm-modal-backdrop" id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" style="display: none;">
+    <div class="confirm-modal-card">
+      <h3 class="confirm-modal-title" id="confirm-modal-title">Confirmação</h3>
+      <p class="confirm-modal-text" id="confirm-modal-text"></p>
+      <div class="confirm-modal-actions">
+        <button type="button" class="btn-nav" id="btn-modal-cancel">Voltar</button>
+        <button type="button" class="btn-nav btn-nav-primary" id="btn-modal-confirm">Confirmar</button>
+      </div>
+    </div>
   </div>
 
   <!-- PeerJS para salas multiplayer em tempo real mesmo em hospedagem estática -->

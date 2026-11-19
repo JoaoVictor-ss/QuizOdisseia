@@ -6,7 +6,7 @@ const crypto = require("crypto");
 const PORT = process.env.PORT || 8090;
 const PUBLIC_DIR = __dirname;
 
-// Gabarito oficial das 6 questões da nova imagem
+// Gabarito oficial das 6 questões
 const CORRECT_ANSWERS = {
   1: "C",
   2: "B",
@@ -20,13 +20,11 @@ const MAX_TIME_MS = 3 * 60 * 1000; // 3 minutos = 180.000 ms
 const MAX_PLAYERS_PER_ROOM = 40;
 
 // Armazenamento em memória das salas e clientes SSE conectados
-// rooms: Map<code, Room>
 const rooms = new Map();
-// sseClients: Map<code, Set<http.ServerResponse>>
 const sseClients = new Map();
 
 function generateRoomCode() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 5 dígitos alfanuméricos claros
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
   do {
     code = "";
@@ -42,10 +40,11 @@ function generatePlayerId() {
 }
 
 function serializeRoom(room) {
-  const playersList = Array.from(room.players.values()).map((p) => ({
+  const allUsers = Array.from(room.players.values()).map((p) => ({
     id: p.id,
     name: p.name,
     isHost: p.id === room.hostId,
+    isSpectator: Boolean(p.isSpectator),
     finished: p.finished,
     score: p.score,
     totalQuestions: 6,
@@ -53,11 +52,14 @@ function serializeRoom(room) {
     joinedAt: p.joinedAt
   }));
 
+  // Apenas participantes que estão jogando entram no Ranking
+  const activePlayers = allUsers.filter((p) => !p.isSpectator);
+
   // Ordena o Ranking:
   // 1) Quem já terminou vem antes de quem ainda está respondendo
   // 2) Maior número de acertos (score DESC)
   // 3) Menor tempo de resposta em milésimos (elapsedMs ASC)
-  const ranking = [...playersList].sort((a, b) => {
+  const ranking = [...activePlayers].sort((a, b) => {
     if (a.finished !== b.finished) {
       return a.finished ? -1 : 1;
     }
@@ -73,12 +75,13 @@ function serializeRoom(room) {
   return {
     code: room.code,
     hostId: room.hostId,
+    hostPlays: room.hostPlays,
     status: room.status, // 'lobby' | 'playing' | 'finished'
     startedAt: room.startedAt,
     serverNow: Date.now(),
     maxPlayers: MAX_PLAYERS_PER_ROOM,
-    playersCount: playersList.length,
-    players: playersList,
+    playersCount: activePlayers.length,
+    players: allUsers,
     ranking
   };
 }
@@ -98,7 +101,7 @@ function broadcastRoom(code) {
   }
 }
 
-// Limpeza periódica de salas inativas há mais de 6 horas para liberar memória
+// Limpeza periódica de salas inativas há mais de 6 horas
 setInterval(() => {
   const now = Date.now();
   const sixHours = 6 * 60 * 60 * 1000;
@@ -165,7 +168,6 @@ function serveStaticFile(req, res, filePath) {
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || "application/octet-stream";
 
-    // Suporte a Range Requests para áudio/vídeo no navegador
     const range = req.headers.range;
     if (range) {
       const parts = range.replace(/bytes=/, "").split("-");
@@ -203,6 +205,8 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readJsonBody(req);
       const name = String(body.playerName || "").trim().slice(0, 40);
+      const hostPlays = body.hostPlays !== false; // default true
+
       if (!name) {
         return sendJson(res, 400, { error: "Digite seu nome para criar a sala." });
       }
@@ -214,6 +218,7 @@ const server = http.createServer(async (req, res) => {
       const room = {
         code,
         hostId: playerId,
+        hostPlays,
         status: "lobby",
         createdAt: now,
         startedAt: null,
@@ -223,6 +228,7 @@ const server = http.createServer(async (req, res) => {
       room.players.set(playerId, {
         id: playerId,
         name,
+        isSpectator: !hostPlays,
         joinedAt: now,
         finished: false,
         score: 0,
@@ -238,6 +244,35 @@ const server = http.createServer(async (req, res) => {
       });
     } catch {
       return sendJson(res, 400, { error: "Erro ao criar a sala." });
+    }
+  }
+
+  // 1b. Alternar se o dono da sala vai jogar ou só acompanhar o ranking
+  if (req.method === "POST" && pathname === "/api/rooms/host-mode") {
+    try {
+      const body = await readJsonBody(req);
+      const code = String(body.code || "").trim().toUpperCase();
+      const playerId = String(body.playerId || "");
+      const hostPlays = Boolean(body.hostPlays);
+
+      const room = rooms.get(code);
+      if (!room) {
+        return sendJson(res, 404, { error: "Sala não encontrada." });
+      }
+      if (room.hostId !== playerId) {
+        return sendJson(res, 403, { error: "Apenas o dono da sala pode alterar este modo." });
+      }
+
+      room.hostPlays = hostPlays;
+      const hostPlayer = room.players.get(playerId);
+      if (hostPlayer) {
+        hostPlayer.isSpectator = !hostPlays;
+      }
+
+      broadcastRoom(code);
+      return sendJson(res, 200, { room: serializeRoom(room) });
+    } catch {
+      return sendJson(res, 400, { error: "Erro ao atualizar modo do criador." });
     }
   }
 
@@ -261,7 +296,6 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 404, { error: "Sala não encontrada. Verifique o código de 5 dígitos." });
       }
 
-      // Reconexão se o jogador já estava na sala
       if (existingId && room.players.has(existingId)) {
         const player = room.players.get(existingId);
         player.name = name;
@@ -273,7 +307,8 @@ const server = http.createServer(async (req, res) => {
         });
       }
 
-      if (room.players.size >= MAX_PLAYERS_PER_ROOM) {
+      const activeCompetitorsCount = Array.from(room.players.values()).filter((p) => !p.isSpectator).length;
+      if (activeCompetitorsCount >= MAX_PLAYERS_PER_ROOM) {
         return sendJson(res, 400, { error: `A sala já atingiu o limite de ${MAX_PLAYERS_PER_ROOM} participantes.` });
       }
 
@@ -281,6 +316,7 @@ const server = http.createServer(async (req, res) => {
       room.players.set(playerId, {
         id: playerId,
         name,
+        isSpectator: false,
         joinedAt: Date.now(),
         finished: false,
         score: 0,
@@ -312,6 +348,12 @@ const server = http.createServer(async (req, res) => {
       }
       if (room.hostId !== playerId) {
         return sendJson(res, 403, { error: "Apenas quem criou a sala pode iniciar a partida." });
+      }
+
+      if (typeof body.hostPlays === "boolean") {
+        room.hostPlays = body.hostPlays;
+        const hp = room.players.get(playerId);
+        if (hp) hp.isSpectator = !body.hostPlays;
       }
 
       room.status = "playing";
@@ -349,7 +391,7 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 404, { error: "Participante não encontrado nesta sala." });
       }
 
-      if (!player.finished) {
+      if (!player.finished && !player.isSpectator) {
         let score = 0;
         for (let q = 1; q <= 6; q++) {
           const chosen = String(answers[q] || "").toUpperCase();
@@ -450,10 +492,8 @@ const server = http.createServer(async (req, res) => {
     const clients = sseClients.get(code);
     clients.add(res);
 
-    // Envia estado inicial imediatamente
     res.write(`data: ${JSON.stringify({ type: "room_update", room: serializeRoom(room) })}\n\n`);
 
-    // Heartbeat a cada 15s para manter a conexão ativa no Render
     const heartbeat = setInterval(() => {
       try {
         res.write(": heartbeat\n\n");
@@ -469,7 +509,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 8. Servir arquivos estáticos (index.html, styles.css, script.js, musica.webm, musica.m4a)
+  // 8. Servir arquivos estáticos
   let safePath = pathname === "/" ? "/index.html" : pathname;
   safePath = decodeURIComponent(safePath);
   const fullPath = path.join(PUBLIC_DIR, safePath);
