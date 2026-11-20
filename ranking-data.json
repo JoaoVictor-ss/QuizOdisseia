@@ -1,1 +1,18 @@
-[]
+[
+  {
+    "id": "p_fcbg4nv1fpfh",
+    "name": "Alexy",
+    "score": 3,
+    "totalQuestions": 6,
+    "elapsedMs": 33024,
+    "finishedAt": 1795199541649
+  },
+  {
+    "id": "p_kurlxegiexcd",
+    "name": "Jão",
+    "score": 1,
+    "totalQuestions": 6,
+    "elapsedMs": 7974,
+    "finishedAt": 1795199480021
+  }
+]
