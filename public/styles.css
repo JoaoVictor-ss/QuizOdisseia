@@ -289,9 +289,14 @@ html, body {
    TELA 0: CAPA + CRIAR OU ENTRAR EM SALA
    ========================================== */
 .slide-card[data-slide="0"] {
-  padding-top: 24px;
-  padding-bottom: 72px;
+  padding-top: clamp(86px, 13vh, 148px);
+  padding-bottom: clamp(46px, 5.8vh, 62px);
   justify-content: space-between;
+}
+
+.slide-card[data-slide="0"] .waves-footer {
+  bottom: -14px;
+  height: clamp(205px, 24vh, 255px);
 }
 
 .cover-content {
@@ -1597,6 +1602,11 @@ html, body {
     padding: 16px 12px 96px;
   }
 
+  .slide-card[data-slide="0"] {
+    padding-top: 28px;
+    padding-bottom: 34px;
+  }
+
   .slide-card[data-slide="lobby"],
   .slide-card[data-slide="7"] {
     padding-top: 12px;
@@ -1697,5 +1707,10 @@ html, body {
 
   .waves-footer {
     height: 76px;
+  }
+
+  .slide-card[data-slide="0"] .waves-footer {
+    height: 92px;
+    bottom: -10px;
   }
 }
