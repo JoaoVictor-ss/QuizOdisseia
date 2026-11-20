@@ -382,13 +382,15 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // 4. Sincronização distribuída (se o servidor reiniciar sem GITHUB_TOKEN, navegadores restauram automaticamente)
+  // 4. Sincronização distribuída (apenas quando GITHUB_TOKEN não está ativo; com GitHub ativo, o GitHub é a fonte oficial)
   if (req.method === "POST" && pathname === "/api/ranking/sync") {
     try {
-      const body = await readJsonBody(req);
-      const changed = mergeEntries(body.cachedRanking || []);
-      if (changed) {
-        persistAndBroadcast();
+      if (!GITHUB_TOKEN) {
+        const body = await readJsonBody(req);
+        const changed = mergeEntries(body.cachedRanking || []);
+        if (changed) {
+          persistAndBroadcast();
+        }
       }
       return sendJson(res, 200, { ranking: rankingEntries });
     } catch {

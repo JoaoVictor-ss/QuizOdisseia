@@ -74,8 +74,8 @@ const QUIZ_QUESTIONS = [
 ];
 
 const MAX_TIME_MS = 3 * 60 * 1000; // 3 minutos = 180.000 ms
-const SESSION_KEY = "quiz_odisseia_session_v3";
-const RANKING_CACHE_KEY = "quiz_odisseia_global_ranking_cache";
+const SESSION_KEY = "quiz_odisseia_session_v4";
+const RANKING_CACHE_KEY = "quiz_odisseia_global_ranking_cache_v2";
 
 // Estado do Quiz
 let currentSlide = "0"; // '0' | '1'..'6' | '7'
