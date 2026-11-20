@@ -5,7 +5,13 @@ const crypto = require("crypto");
 
 const PORT = process.env.PORT || 8090;
 const PUBLIC_DIR = __dirname;
-const CACHE_FILE = path.join(__dirname, ".rooms-cache.json");
+const LOCAL_DATA_FILE = path.join(__dirname, "ranking-data.json");
+
+// Configuração opcional de persistência permanente sem banco de dados via GitHub (branch separada para não dar redeploy no Render)
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
+const GITHUB_REPO = process.env.GITHUB_REPO || "JoaoVictor-ss/QuizOdisseia";
+const GITHUB_BRANCH = process.env.GITHUB_RANKING_BRANCH || "ranking-data";
+const GITHUB_FILE_PATH = "ranking-data.json";
 
 // Gabarito oficial das 6 questões
 const CORRECT_ANSWERS = {
@@ -18,82 +24,15 @@ const CORRECT_ANSWERS = {
 };
 
 const MAX_TIME_MS = 3 * 60 * 1000; // 3 minutos = 180.000 ms
-const MAX_PLAYERS_PER_ROOM = 40;
 
-// Armazenamento em memória das salas e clientes SSE conectados
-const rooms = new Map();
-const sseClients = new Map();
+// Estado global do ranking em memória + clientes SSE
+let rankingEntries = [];
+const sseClients = new Set();
 
-// Carrega backup das salas do disco caso o servidor reinicie
-function loadRoomsFromCache() {
-  try {
-    if (!fs.existsSync(CACHE_FILE)) return;
-    const raw = fs.readFileSync(CACHE_FILE, "utf-8");
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return;
-    const now = Date.now();
-    const sixHours = 6 * 60 * 60 * 1000;
-    for (const r of parsed) {
-      if (r && r.code && now - (r.createdAt || now) < sixHours) {
-        const playersMap = new Map();
-        if (Array.isArray(r.players)) {
-          for (const p of r.players) {
-            if (p && p.id) playersMap.set(p.id, p);
-          }
-        }
-        rooms.set(r.code, {
-          code: r.code,
-          hostId: r.hostId,
-          hostPlays: r.hostPlays !== false,
-          status: r.status || "lobby",
-          createdAt: r.createdAt || now,
-          startedAt: r.startedAt || null,
-          players: playersMap
-        });
-      }
-    }
-  } catch {
-    // Ignora erro de leitura de cache
-  }
-}
-
-function saveRoomsToCache() {
-  try {
-    const dump = [];
-    for (const room of rooms.values()) {
-      dump.push({
-        code: room.code,
-        hostId: room.hostId,
-        hostPlays: room.hostPlays,
-        status: room.status,
-        createdAt: room.createdAt,
-        startedAt: room.startedAt,
-        players: Array.from(room.players.values())
-      });
-    }
-    fs.writeFile(CACHE_FILE, JSON.stringify(dump), () => {});
-  } catch {
-    // Ignora erro de escrita de cache
-  }
-}
-
-loadRoomsFromCache();
-
-function generateRoomCode() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  do {
-    code = "";
-    for (let i = 0; i < 5; i++) {
-      code += chars[Math.floor(Math.random() * chars.length)];
-    }
-  } while (rooms.has(code));
-  return code;
-}
-
-function generatePlayerId() {
-  return crypto.randomBytes(8).toString("hex");
-}
+// Fila de gravação no GitHub para evitar conflito de SHA quando várias pessoas finalizam juntas
+let githubSavePending = false;
+let githubSaveRunning = false;
+let githubFileSha = null;
 
 function calculateOfficialScore(answers) {
   let score = 0;
@@ -107,82 +46,195 @@ function calculateOfficialScore(answers) {
   return score;
 }
 
-function serializeRoom(room) {
-  const allUsers = Array.from(room.players.values()).map((p) => ({
-    id: p.id,
-    name: p.name,
-    isHost: p.id === room.hostId,
-    isSpectator: Boolean(p.isSpectator),
-    finished: Boolean(p.finished),
-    score: typeof p.score === "number" ? p.score : 0,
-    totalQuestions: 6,
-    elapsedMs: p.elapsedMs,
-    joinedAt: p.joinedAt || Date.now()
-  }));
-
-  const activePlayers = allUsers.filter((p) => !p.isSpectator);
-
-  const ranking = [...activePlayers].sort((a, b) => {
-    if (a.finished !== b.finished) {
-      return a.finished ? -1 : 1;
-    }
-    if (!a.finished && !b.finished) {
-      return a.joinedAt - b.joinedAt;
-    }
-    if (b.score !== a.score) {
-      return b.score - a.score;
-    }
-    return (a.elapsedMs ?? MAX_TIME_MS) - (b.elapsedMs ?? MAX_TIME_MS);
+function sortRanking(list) {
+  return [...list].sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (a.elapsedMs !== b.elapsedMs) return a.elapsedMs - b.elapsedMs;
+    return (a.finishedAt || 0) - (b.finishedAt || 0);
   });
-
-  return {
-    code: room.code,
-    hostId: room.hostId,
-    hostPlays: room.hostPlays,
-    status: room.status,
-    startedAt: room.startedAt,
-    serverNow: Date.now(),
-    maxPlayers: MAX_PLAYERS_PER_ROOM,
-    playersCount: activePlayers.length,
-    players: allUsers,
-    ranking
-  };
 }
 
-function broadcastRoom(code) {
-  saveRoomsToCache();
-  const room = rooms.get(code);
-  const clients = sseClients.get(code);
-  if (!room || !clients || clients.size === 0) return;
+function mergeEntries(incomingList) {
+  if (!Array.isArray(incomingList)) return false;
+  const map = new Map();
+  for (const item of rankingEntries) {
+    if (item && item.id) map.set(item.id, item);
+  }
+  let changed = false;
+  for (const raw of incomingList) {
+    if (!raw || !raw.id || !raw.name) continue;
+    if (!map.has(raw.id)) {
+      const score = Math.max(0, Math.min(6, Number(raw.score) || 0));
+      const elapsedMs = Math.min(MAX_TIME_MS, Math.max(100, Math.round(Number(raw.elapsedMs) || MAX_TIME_MS)));
+      map.set(String(raw.id), {
+        id: String(raw.id),
+        name: String(raw.name).trim().slice(0, 40),
+        score,
+        totalQuestions: 6,
+        elapsedMs,
+        finishedAt: Number(raw.finishedAt) || Date.now()
+      });
+      changed = true;
+    }
+  }
+  if (changed) {
+    rankingEntries = sortRanking(Array.from(map.values()));
+  }
+  return changed;
+}
 
-  const payload = `data: ${JSON.stringify({ type: "room_update", room: serializeRoom(room) })}\n\n`;
-  for (const res of clients) {
+// ==========================================
+// PERSISTÊNCIA SEM BANCO DE DADOS:
+// 1) Arquivo local ranking-data.json
+// 2) Branch separada no GitHub (ranking-data) via API REST (sobrevive a sleep/reinício/redeploy do Render!)
+// ==========================================
+function loadFromLocalDisk() {
+  try {
+    if (!fs.existsSync(LOCAL_DATA_FILE)) return;
+    const raw = fs.readFileSync(LOCAL_DATA_FILE, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      mergeEntries(parsed);
+    }
+  } catch {
+    // Ignora se arquivo ainda não existir ou estiver inválido
+  }
+}
+
+function saveToLocalDisk() {
+  try {
+    fs.writeFile(LOCAL_DATA_FILE, JSON.stringify(rankingEntries, null, 2), () => {});
+  } catch {
+    // Ignora erro de disco
+  }
+}
+
+async function loadFromGitHub() {
+  // Mesmo sem token, se o repo for público, já tenta ler o ranking salvo na branch ranking-data!
+  const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE_PATH}?ref=${GITHUB_BRANCH}`;
+  const headers = {
+    "Accept": "application/vnd.github+json",
+    "User-Agent": "QuizOdisseia-Server"
+  };
+  if (GITHUB_TOKEN) {
+    headers["Authorization"] = `Bearer ${GITHUB_TOKEN}`;
+  }
+
+  try {
+    const res = await fetch(apiUrl, { headers });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.sha) {
+      githubFileSha = data.sha;
+    }
+    if (data && data.content) {
+      const decoded = Buffer.from(data.content.replace(/\n/g, ""), "base64").toString("utf-8");
+      const parsed = JSON.parse(decoded);
+      if (Array.isArray(parsed)) {
+        mergeEntries(parsed);
+        saveToLocalDisk();
+        console.log(`Ranking restaurado do GitHub (${rankingEntries.length} registros).`);
+      }
+    }
+  } catch (err) {
+    console.log("Aviso ao ler ranking do GitHub:", err.message);
+  }
+}
+
+async function flushToGitHub() {
+  if (!GITHUB_TOKEN) return;
+  if (githubSaveRunning) {
+    githubSavePending = true;
+    return;
+  }
+
+  githubSaveRunning = true;
+  githubSavePending = false;
+
+  const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE_PATH}`;
+  const headers = {
+    "Accept": "application/vnd.github+json",
+    "Authorization": `Bearer ${GITHUB_TOKEN}`,
+    "Content-Type": "application/json",
+    "User-Agent": "QuizOdisseia-Server"
+  };
+
+  try {
+    // Garante o SHA mais recente antes de atualizar
+    if (!githubFileSha) {
+      const getRes = await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`, { headers });
+      if (getRes.ok) {
+        const getJson = await getRes.json();
+        githubFileSha = getJson.sha || null;
+      }
+    }
+
+    const contentBase64 = Buffer.from(JSON.stringify(rankingEntries, null, 2), "utf-8").toString("base64");
+    const payload = {
+      message: `Atualiza ranking (${rankingEntries.length} participantes)`,
+      content: contentBase64,
+      branch: GITHUB_BRANCH
+    };
+    if (githubFileSha) {
+      payload.sha = githubFileSha;
+    }
+
+    const putRes = await fetch(apiUrl, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify(payload)
+    });
+
+    if (putRes.ok) {
+      const putJson = await putRes.json();
+      if (putJson && putJson.content && putJson.content.sha) {
+        githubFileSha = putJson.content.sha;
+      }
+    } else if (putRes.status === 409) {
+      // Conflito de SHA: recarrega e tenta novamente
+      githubFileSha = null;
+      await loadFromGitHub();
+      githubSavePending = true;
+    }
+  } catch (err) {
+    console.log("Aviso ao salvar ranking no GitHub:", err.message);
+  } finally {
+    githubSaveRunning = false;
+    if (githubSavePending) {
+      setTimeout(flushToGitHub, 800);
+    }
+  }
+}
+
+function persistAndBroadcast() {
+  saveToLocalDisk();
+  flushToGitHub();
+
+  const payload = `data: ${JSON.stringify({
+    type: "ranking_update",
+    ranking: rankingEntries,
+    persistenceMode: GITHUB_TOKEN ? "github" : "local+client-sync"
+  })}\n\n`;
+
+  for (const res of sseClients) {
     try {
       res.write(payload);
     } catch {
-      clients.delete(res);
+      sseClients.delete(res);
     }
   }
 }
 
-setInterval(() => {
-  const now = Date.now();
-  const sixHours = 6 * 60 * 60 * 1000;
-  for (const [code, room] of rooms.entries()) {
-    if (now - room.createdAt > sixHours) {
-      rooms.delete(code);
-      sseClients.delete(code);
-    }
-  }
-  saveRoomsToCache();
-}, 30 * 60 * 1000);
+// Carrega dados salvos ao iniciar o servidor
+loadFromLocalDisk();
+loadFromGitHub();
 
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk.toString();
-      if (body.length > 1e5) {
+      if (body.length > 5e5) {
         reject(new Error("Payload muito grande"));
       }
     });
@@ -268,352 +320,84 @@ const server = http.createServer(async (req, res) => {
   const parsedUrl = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const pathname = parsedUrl.pathname;
 
-  // 1. Criar nova sala
-  if (req.method === "POST" && pathname === "/api/rooms/create") {
+  // 1. Health check (útil para monitoramento ou ping opcional)
+  if (req.method === "GET" && pathname === "/api/health") {
+    return sendJson(res, 200, {
+      ok: true,
+      totalEntries: rankingEntries.length,
+      persistenceMode: GITHUB_TOKEN ? "github-branch" : "local+client-sync"
+    });
+  }
+
+  // 2. Obter Ranking Global
+  if (req.method === "GET" && pathname === "/api/ranking") {
+    return sendJson(res, 200, {
+      ranking: rankingEntries,
+      persistenceMode: GITHUB_TOKEN ? "github-branch" : "local+client-sync"
+    });
+  }
+
+  // 3. Enviar resultado de um participante para o Ranking Global
+  if (req.method === "POST" && pathname === "/api/ranking/submit") {
     try {
       const body = await readJsonBody(req);
-      const name = String(body.playerName || "").trim().slice(0, 40);
-      const hostPlays = body.hostPlays !== false;
-
+      const name = String(body.name || "").trim().slice(0, 40);
       if (!name) {
-        return sendJson(res, 400, { error: "Digite seu nome para criar a sala." });
+        return sendJson(res, 400, { error: "Nome do participante é obrigatório." });
       }
 
-      const code = generateRoomCode();
-      const playerId = generatePlayerId();
-      const now = Date.now();
+      const id = body.id ? String(body.id) : crypto.randomBytes(8).toString("hex");
+      const answers = body.answers && typeof body.answers === "object" ? body.answers : {};
+      const score = calculateOfficialScore(answers);
+      const rawElapsed = Number(body.elapsedMs);
+      const elapsedMs = Number.isFinite(rawElapsed) && rawElapsed > 0
+        ? Math.min(MAX_TIME_MS, Math.max(100, Math.round(rawElapsed)))
+        : MAX_TIME_MS;
 
-      const room = {
-        code,
-        hostId: playerId,
-        hostPlays,
-        status: "lobby",
-        createdAt: now,
-        startedAt: null,
-        players: new Map()
+      const entry = {
+        id,
+        name,
+        score,
+        totalQuestions: 6,
+        elapsedMs,
+        finishedAt: Date.now()
       };
 
-      room.players.set(playerId, {
-        id: playerId,
-        name,
-        isSpectator: !hostPlays,
-        joinedAt: now,
-        finished: false,
-        score: 0,
-        elapsedMs: null,
-        answers: {}
-      });
+      // Atualiza se o mesmo ID já existe ou adiciona novo registro
+      const existingIdx = rankingEntries.findIndex((e) => e.id === id);
+      if (existingIdx >= 0) {
+        rankingEntries[existingIdx] = entry;
+      } else {
+        rankingEntries.push(entry);
+      }
+      rankingEntries = sortRanking(rankingEntries);
 
-      rooms.set(code, room);
-      saveRoomsToCache();
+      persistAndBroadcast();
       return sendJson(res, 200, {
-        code,
-        playerId,
-        room: serializeRoom(room)
+        entry,
+        ranking: rankingEntries
       });
     } catch {
-      return sendJson(res, 400, { error: "Erro ao criar a sala." });
+      return sendJson(res, 400, { error: "Erro ao registrar resultado no ranking." });
     }
   }
 
-  // 1b. Alternar se o dono da sala vai jogar ou só acompanhar o ranking
-  if (req.method === "POST" && pathname === "/api/rooms/host-mode") {
+  // 4. Sincronização distribuída (se o servidor reiniciar sem GITHUB_TOKEN, navegadores restauram automaticamente)
+  if (req.method === "POST" && pathname === "/api/ranking/sync") {
     try {
       const body = await readJsonBody(req);
-      const code = String(body.code || "").trim().toUpperCase();
-      const playerId = String(body.playerId || "");
-      const hostPlays = Boolean(body.hostPlays);
-
-      const room = rooms.get(code);
-      if (!room) {
-        return sendJson(res, 404, { error: "Sala não encontrada." });
+      const changed = mergeEntries(body.cachedRanking || []);
+      if (changed) {
+        persistAndBroadcast();
       }
-      if (room.hostId !== playerId) {
-        return sendJson(res, 403, { error: "Apenas o dono da sala pode alterar este modo." });
-      }
-
-      room.hostPlays = hostPlays;
-      const hostPlayer = room.players.get(playerId);
-      if (hostPlayer) {
-        hostPlayer.isSpectator = !hostPlays;
-      }
-
-      broadcastRoom(code);
-      return sendJson(res, 200, { room: serializeRoom(room) });
+      return sendJson(res, 200, { ranking: rankingEntries });
     } catch {
-      return sendJson(res, 400, { error: "Erro ao atualizar modo do criador." });
+      return sendJson(res, 400, { error: "Erro ao sincronizar ranking." });
     }
   }
 
-  // 1c. Reidratar sessão/sala caso o cliente volte de outra aba ou o servidor tenha reiniciado
-  if (req.method === "POST" && pathname === "/api/rooms/rehydrate") {
-    try {
-      const body = await readJsonBody(req);
-      const code = String(body.code || "").trim().toUpperCase();
-      const playerId = String(body.playerId || "");
-      const playerName = String(body.playerName || "Tripulante").trim().slice(0, 40);
-      if (!code || code.length !== 5 || !playerId) {
-        return sendJson(res, 400, { error: "Dados inválidos para restaurar sessão." });
-      }
-
-      let room = rooms.get(code);
-      const now = Date.now();
-      if (!room) {
-        // Recria a sala se o servidor do Render tiver reiniciado durante a partida
-        room = {
-          code,
-          hostId: body.isHost ? playerId : (body.hostId || playerId),
-          hostPlays: body.hostPlays !== false,
-          status: body.roomStatus || (body.hasSubmitted ? "playing" : "lobby"),
-          createdAt: now,
-          startedAt: body.startedAt || now,
-          players: new Map()
-        };
-        if (Array.isArray(body.cachedPlayers)) {
-          for (const cp of body.cachedPlayers) {
-            if (cp && cp.id) {
-              room.players.set(cp.id, {
-                id: cp.id,
-                name: String(cp.name || "Tripulante").slice(0, 40),
-                isSpectator: Boolean(cp.isSpectator),
-                joinedAt: cp.joinedAt || now,
-                finished: Boolean(cp.finished),
-                score: typeof cp.score === "number" ? cp.score : 0,
-                elapsedMs: cp.elapsedMs || null,
-                answers: {}
-              });
-            }
-          }
-        }
-        rooms.set(code, room);
-      }
-
-      let player = room.players.get(playerId);
-      if (!player) {
-        player = {
-          id: playerId,
-          name: playerName,
-          isSpectator: Boolean(body.isHost && body.hostPlays === false),
-          joinedAt: now,
-          finished: false,
-          score: 0,
-          elapsedMs: null,
-          answers: {}
-        };
-        room.players.set(playerId, player);
-      }
-
-      if (body.hasSubmitted && !player.isSpectator) {
-        const answers = body.answers && typeof body.answers === "object" ? body.answers : player.answers;
-        player.finished = true;
-        player.answers = answers;
-        player.score = calculateOfficialScore(answers);
-        player.elapsedMs = Math.min(MAX_TIME_MS, Math.max(100, Number(body.elapsedMs) || player.elapsedMs || MAX_TIME_MS));
-      }
-
-      broadcastRoom(code);
-      return sendJson(res, 200, { room: serializeRoom(room) });
-    } catch {
-      return sendJson(res, 400, { error: "Erro ao restaurar sessão." });
-    }
-  }
-
-  // 2. Entrar em uma sala existente
-  if (req.method === "POST" && pathname === "/api/rooms/join") {
-    try {
-      const body = await readJsonBody(req);
-      const code = String(body.code || "").trim().toUpperCase();
-      const name = String(body.playerName || "").trim().slice(0, 40);
-      const existingId = body.playerId ? String(body.playerId) : null;
-
-      if (!code || code.length !== 5) {
-        return sendJson(res, 400, { error: "Digite um código de sala válido de 5 dígitos." });
-      }
-      if (!name) {
-        return sendJson(res, 400, { error: "Digite seu nome para entrar na sala." });
-      }
-
-      const room = rooms.get(code);
-      if (!room) {
-        return sendJson(res, 404, { error: "Sala não encontrada. Verifique o código de 5 dígitos." });
-      }
-
-      if (existingId && room.players.has(existingId)) {
-        const player = room.players.get(existingId);
-        player.name = name;
-        broadcastRoom(code);
-        return sendJson(res, 200, {
-          code,
-          playerId: existingId,
-          room: serializeRoom(room)
-        });
-      }
-
-      const activeCompetitorsCount = Array.from(room.players.values()).filter((p) => !p.isSpectator).length;
-      if (activeCompetitorsCount >= MAX_PLAYERS_PER_ROOM) {
-        return sendJson(res, 400, { error: `A sala já atingiu o limite de ${MAX_PLAYERS_PER_ROOM} participantes.` });
-      }
-
-      const playerId = generatePlayerId();
-      room.players.set(playerId, {
-        id: playerId,
-        name,
-        isSpectator: false,
-        joinedAt: Date.now(),
-        finished: false,
-        score: 0,
-        elapsedMs: null,
-        answers: {}
-      });
-
-      broadcastRoom(code);
-      return sendJson(res, 200, {
-        code,
-        playerId,
-        room: serializeRoom(room)
-      });
-    } catch {
-      return sendJson(res, 400, { error: "Erro ao entrar na sala." });
-    }
-  }
-
-  // 3. Iniciar partida para todos na sala
-  if (req.method === "POST" && pathname === "/api/rooms/start") {
-    try {
-      const body = await readJsonBody(req);
-      const code = String(body.code || "").trim().toUpperCase();
-      const playerId = String(body.playerId || "");
-
-      const room = rooms.get(code);
-      if (!room) {
-        return sendJson(res, 404, { error: "Sala não encontrada." });
-      }
-      if (room.hostId !== playerId) {
-        return sendJson(res, 403, { error: "Apenas quem criou a sala pode iniciar a partida." });
-      }
-
-      if (typeof body.hostPlays === "boolean") {
-        room.hostPlays = body.hostPlays;
-        const hp = room.players.get(playerId);
-        if (hp) hp.isSpectator = !body.hostPlays;
-      }
-
-      room.status = "playing";
-      room.startedAt = Date.now();
-
-      for (const p of room.players.values()) {
-        p.finished = false;
-        p.score = 0;
-        p.elapsedMs = null;
-        p.answers = {};
-      }
-
-      broadcastRoom(code);
-      return sendJson(res, 200, { room: serializeRoom(room) });
-    } catch {
-      return sendJson(res, 400, { error: "Erro ao iniciar a partida." });
-    }
-  }
-
-  // 4. Enviar respostas e tempo final do participante
-  if (req.method === "POST" && pathname === "/api/rooms/submit") {
-    try {
-      const body = await readJsonBody(req);
-      const code = String(body.code || "").trim().toUpperCase();
-      const playerId = String(body.playerId || "");
-      const answers = body.answers && typeof body.answers === "object" ? body.answers : {};
-
-      const room = rooms.get(code);
-      if (!room) {
-        return sendJson(res, 404, { error: "Sala não encontrada." });
-      }
-
-      const player = room.players.get(playerId);
-      if (!player) {
-        return sendJson(res, 404, { error: "Participante não encontrado nesta sala." });
-      }
-
-      if (!player.finished && !player.isSpectator) {
-        const score = calculateOfficialScore(answers);
-        const rawElapsed = Number(body.elapsedMs);
-        const serverElapsed = room.startedAt ? Date.now() - room.startedAt : MAX_TIME_MS;
-        const validElapsed = Number.isFinite(rawElapsed) && rawElapsed > 0
-          ? Math.min(MAX_TIME_MS, Math.max(100, Math.round(rawElapsed)))
-          : Math.min(MAX_TIME_MS, Math.max(100, serverElapsed));
-
-        player.finished = true;
-        player.score = score;
-        player.elapsedMs = validElapsed;
-        player.answers = answers;
-      }
-
-      broadcastRoom(code);
-      return sendJson(res, 200, {
-        room: serializeRoom(room),
-        playerResult: {
-          score: player.score,
-          elapsedMs: player.elapsedMs,
-          answers: player.answers
-        }
-      });
-    } catch {
-      return sendJson(res, 400, { error: "Erro ao enviar respostas." });
-    }
-  }
-
-  // 5. Reiniciar sala de volta para o Lobby
-  if (req.method === "POST" && pathname === "/api/rooms/reset") {
-    try {
-      const body = await readJsonBody(req);
-      const code = String(body.code || "").trim().toUpperCase();
-      const playerId = String(body.playerId || "");
-
-      const room = rooms.get(code);
-      if (!room) {
-        return sendJson(res, 404, { error: "Sala não encontrada." });
-      }
-      if (room.hostId !== playerId) {
-        return sendJson(res, 403, { error: "Apenas o criador da sala pode reiniciar a partida." });
-      }
-
-      room.status = "lobby";
-      room.startedAt = null;
-      for (const p of room.players.values()) {
-        p.finished = false;
-        p.score = 0;
-        p.elapsedMs = null;
-        p.answers = {};
-      }
-
-      broadcastRoom(code);
-      return sendJson(res, 200, { room: serializeRoom(room) });
-    } catch {
-      return sendJson(res, 400, { error: "Erro ao reiniciar a sala." });
-    }
-  }
-
-  // 6. Consultar estado atual de uma sala
-  const roomMatch = pathname.match(/^\/api\/rooms\/([A-Za-z0-9]{5})$/);
-  if (req.method === "GET" && roomMatch) {
-    const code = roomMatch[1].toUpperCase();
-    const room = rooms.get(code);
-    if (!room) {
-      return sendJson(res, 404, { error: "Sala não encontrada." });
-    }
-    return sendJson(res, 200, { room: serializeRoom(room) });
-  }
-
-  // 7. Stream de eventos em tempo real (SSE) da sala
-  const eventsMatch = pathname.match(/^\/api\/rooms\/([A-Za-z0-9]{5})\/events$/);
-  if (req.method === "GET" && eventsMatch) {
-    const code = eventsMatch[1].toUpperCase();
-    const room = rooms.get(code);
-    if (!room) {
-      res.writeHead(404);
-      res.end();
-      return;
-    }
-
+  // 5. Stream de eventos em tempo real (SSE) do Ranking Global
+  if (req.method === "GET" && pathname === "/api/ranking/events") {
     res.writeHead(200, {
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
@@ -621,13 +405,14 @@ const server = http.createServer(async (req, res) => {
       "X-Accel-Buffering": "no"
     });
 
-    if (!sseClients.has(code)) {
-      sseClients.set(code, new Set());
-    }
-    const clients = sseClients.get(code);
-    clients.add(res);
-
-    res.write(`data: ${JSON.stringify({ type: "room_update", room: serializeRoom(room) })}\n\n`);
+    sseClients.add(res);
+    res.write(
+      `data: ${JSON.stringify({
+        type: "ranking_update",
+        ranking: rankingEntries,
+        persistenceMode: GITHUB_TOKEN ? "github-branch" : "local+client-sync"
+      })}\n\n`
+    );
 
     const heartbeat = setInterval(() => {
       try {
@@ -639,12 +424,12 @@ const server = http.createServer(async (req, res) => {
 
     req.on("close", () => {
       clearInterval(heartbeat);
-      clients.delete(res);
+      sseClients.delete(res);
     });
     return;
   }
 
-  // 8. Servir arquivos estáticos
+  // 6. Servir arquivos estáticos
   let safePath = pathname === "/" ? "/index.html" : pathname;
   safePath = decodeURIComponent(safePath);
   const fullPath = path.join(PUBLIC_DIR, safePath);

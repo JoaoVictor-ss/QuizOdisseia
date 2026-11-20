@@ -358,7 +358,37 @@ html, body {
   max-width: 100%;
 }
 
-/* Painel de Criar / Entrar em Sala (100% Centralizado) */
+/* Card Simples de Início (Sem sistema de salas) */
+.entry-simple-card {
+  max-width: 560px;
+  padding: 20px 24px;
+  gap: 14px;
+}
+
+.entry-intro-text {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-body);
+  line-height: 1.35;
+}
+
+.entry-simple-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.btn-start-big {
+  font-size: 1.12rem;
+  padding: 12px 30px;
+  max-width: 260px;
+}
+
+/* Painel de Início */
 .entry-hub-card {
   width: 100%;
   max-width: 680px;

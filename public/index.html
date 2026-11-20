@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=JetBrains+Mono:wght@700;800&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261118b" />
+  <link rel="stylesheet" href="styles.css?v=20261120a" />
 </head>
 <body>
 
@@ -117,7 +117,7 @@
         <path d="M47 42 C60 40 65 28 53 27 C48 27 46 35 47 42 Z" fill="#102D4F" />
       </symbol>
 
-      <!-- ÍCONE DE SOM VETORIAL (SEM EMOJI) -->
+      <!-- ÍCONE DE SOM VETORIAL -->
       <symbol id="svg-speaker-on" viewBox="0 0 24 24">
         <path d="M11 5L6 9H2V15H6L11 19V5Z" fill="#102D4F" />
         <path d="M15.54 8.46C16.48 9.4 17 10.67 17 12C17 13.33 16.48 14.6 15.54 15.54" fill="none" stroke="#102D4F" stroke-width="2.2" stroke-linecap="round" />
@@ -158,19 +158,15 @@
       </div>
     </header>
 
-    <!-- Barra de Cronômetro de 3 Minutos no Topo (Apenas Sala e Tempo Restante) -->
+    <!-- Barra de Cronômetro de 3 Minutos no Topo (Apenas Tempo Restante, sem mexer) -->
     <div class="timer-topbar" id="timer-topbar" aria-live="polite">
-      <div class="timer-room-badge">
-        <span>Sala:</span>
-        <strong id="timer-room-code">-----</strong>
-      </div>
       <div class="timer-clock-box" id="timer-clock-box">
         <span class="timer-label">Tempo Restante:</span>
         <span class="timer-digits" id="timer-remaining">03:00</span>
       </div>
     </div>
 
-    <!-- Áudio da Música solicitada + Som do Mar -->
+    <!-- Áudio da Música + Som do Mar -->
     <audio id="bg-music" autoplay loop preload="auto">
       <source src="musica.webm" type="audio/webm" />
       <source src="musica.m4a" type="audio/mp4" />
@@ -182,10 +178,9 @@
       <div class="slides-container" id="slides-container">
 
         <!-- =================================================
-             TELA 0: CAPA + CRIAR OU ENTRAR EM SALA MULTIPLAYER
-             ("Jornada Odisseia: sobrevivendo às mudanças")
+             TELA 0: CAPA DIRETA PARA INICIAR O QUIZ (SEM SALAS)
              ================================================= -->
-        <section class="slide-card active" data-slide="0" aria-label="Capa e Entrada na Sala">
+        <section class="slide-card active" data-slide="0" aria-label="Capa do Quiz">
           <div class="cover-content">
             <div class="title-badge-group">
               <svg class="title-rays-left" width="65" height="90" viewBox="0 0 65 90" aria-hidden="true">
@@ -208,8 +203,12 @@
               </svg>
             </div>
 
-            <!-- Painel Central de Entrada / Criação de Sala (Até 40 jogadores) -->
-            <div class="entry-hub-card">
+            <!-- Card Simples de Início: Nome + Começar Quiz (3 minutos) -->
+            <div class="entry-hub-card entry-simple-card">
+              <p class="entry-intro-text">
+                Responda às 6 questões em até <strong>3 minutos</strong> e entre para o Ranking Geral!
+              </p>
+
               <div class="entry-name-row">
                 <label for="input-player-name" class="entry-label">Seu Nome:</label>
                 <input
@@ -222,34 +221,13 @@
                 />
               </div>
 
-              <div class="entry-actions-grid">
-                <!-- Coluna 1: Criar Nova Sala -->
-                <div class="entry-box">
-                  <div class="entry-box-title">Criar Nova Sala</div>
-                  <p class="entry-box-desc">Gere um código de 5 dígitos e convide até 40 pessoas para a sala.</p>
-                  <button type="button" class="btn-entry-primary" id="btn-create-room">
-                    <span>Criar Sala</span>
-                  </button>
-                </div>
-
-                <!-- Coluna 2: Entrar em Sala com Código de 5 dígitos -->
-                <div class="entry-box">
-                  <div class="entry-box-title">Entrar em uma Sala</div>
-                  <p class="entry-box-desc">Digite o código de 5 dígitos ou abra pelo link de convite:</p>
-                  <div class="join-code-row">
-                    <input
-                      type="text"
-                      id="input-room-code"
-                      class="entry-code-input"
-                      placeholder="CÓDIGO"
-                      maxlength="5"
-                      autocomplete="off"
-                    />
-                    <button type="button" class="btn-entry-secondary" id="btn-join-room">
-                      <span>Entrar →</span>
-                    </button>
-                  </div>
-                </div>
+              <div class="entry-simple-actions">
+                <button type="button" class="btn-entry-primary btn-start-big" id="btn-start-quiz">
+                  <span>Começar Quiz →</span>
+                </button>
+                <button type="button" class="btn-nav" id="btn-view-ranking">
+                  <span>Ver Ranking Geral</span>
+                </button>
               </div>
 
               <div class="entry-error-msg" id="entry-error-msg" role="alert"></div>
@@ -278,80 +256,13 @@
           </div>
         </section>
 
-        <!-- =================================================
-             TELA LOBBY: SALA DE ESPERA (ATÉ 40 JOGADORES)
-             ================================================= -->
-        <section class="slide-card" data-slide="lobby" aria-label="Lobby de Espera da Sala">
-          <div class="lobby-layout">
-            <div class="lobby-header-card">
-              <div class="lobby-badge-top">SALA DE ESPERA — ATÉ 40 TRIPULANTES</div>
-
-              <div class="lobby-code-row">
-                <div class="lobby-code-box">
-                  <span class="lobby-code-label">Código da Sala:</span>
-                  <strong class="lobby-code-digits" id="lobby-room-code">-----</strong>
-                </div>
-
-                <button type="button" class="btn-share btn-share-link" id="btn-copy-link">
-                  <span>Copiar Link de Convite</span>
-                </button>
-              </div>
-
-              <div class="lobby-share-url-preview" id="lobby-share-url-preview"></div>
-              <div class="lobby-copy-feedback" id="lobby-copy-feedback" aria-live="polite"></div>
-
-              <!-- Switch simples para o Dono da Sala: Ligado = Jogar, Desligado = Não jogar -->
-              <div class="lobby-host-switch-row" id="lobby-host-mode-bar" style="display: none;">
-                <label class="host-switch-label" for="input-host-play-switch">
-                  <span class="host-switch-text">Participar jogando da partida</span>
-                  <div class="switch-wrap">
-                    <input type="checkbox" id="input-host-play-switch" class="switch-checkbox" checked />
-                    <span class="switch-slider"></span>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            <!-- Lista Ao Vivo de Participantes na Sala (Com Scroll para o botão de iniciar nunca sumir) -->
-            <div class="lobby-players-card">
-              <div class="lobby-players-header">
-                <h3>Tripulantes que vão jogar</h3>
-                <span class="lobby-count-pill" id="lobby-players-count">1 / 40</span>
-              </div>
-
-              <div class="lobby-players-grid" id="lobby-players-grid"></div>
-            </div>
-
-            <!-- Rodapé do Lobby: Botão de Iniciar (para quem criou a sala) ou Mensagem de Espera -->
-            <div class="lobby-footer-actions">
-              <button type="button" class="btn-nav" id="btn-leave-lobby">
-                <span>← Sair da Sala</span>
-              </button>
-
-              <div id="lobby-host-controls" style="display: none;">
-                <button type="button" class="btn-start-match" id="btn-start-match">
-                  <span>Iniciar Partida para Todos (3 min)</span>
-                </button>
-              </div>
-
-              <div id="lobby-guest-waiting" class="lobby-waiting-banner" style="display: none;">
-                <span>Aguardando o criador da sala iniciar a partida...</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="waves-footer">
-            <svg><use href="#svg-ocean-waves"></use></svg>
-          </div>
-        </section>
-
         <!-- As 6 Telas de Perguntas são montadas aqui via script.js -->
         <div id="questions-mount"></div>
 
         <!-- =================================================
-             TELA 7: RANKING AO VIVO + LEMBRETE + GABARITO
+             TELA 7: RANKING GERAL AO VIVO + LEMBRETE + GABARITO
              ================================================= -->
-        <section class="slide-card" data-slide="7" aria-label="Ranking Final e Lembrete">
+        <section class="slide-card" data-slide="7" aria-label="Ranking Geral e Lembrete">
           <div class="final-layout">
             <div class="final-banner-group">
               <svg class="final-rays-left" width="85" height="75" viewBox="0 0 85 75" aria-hidden="true">
@@ -380,7 +291,7 @@
             </div>
 
             <div class="final-main-body">
-              <!-- Card Azul Claro com o Lembrete da nova imagem -->
+              <!-- Card Azul Claro com o Lembrete -->
               <div class="final-message-card">
                 <p class="final-message-text">
                   “Nem sempre controlamos os ventos ou escolhemos as tempestades,
@@ -395,7 +306,7 @@
                 </div>
               </div>
 
-              <!-- Resumo Individual do Jogador (Ocultado quando o dono escolhe só acompanhar) -->
+              <!-- Resumo Individual do Jogador (Acertos + Tempo com Milésimos) -->
               <div class="my-score-summary" id="my-score-summary">
                 <div class="score-pill">
                   <span class="score-pill-label">Sua Posição</span>
@@ -411,20 +322,15 @@
                 </div>
               </div>
 
-              <!-- RANKING AO VIVO DA SALA (ATÉ 40 JOGADORES - COM MILÉSIMOS PARA DESEMPATE) -->
+              <!-- RANKING GERAL DE TODO MUNDO QUE FEZ O QUIZ -->
               <div class="ranking-card">
                 <div class="ranking-header">
-                  <h3>Ranking da Sala (<span id="ranking-room-code">-----</span>)</h3>
-                  <div class="ranking-header-badges">
-                    <span class="ranking-spectator-timer" id="ranking-spectator-timer" style="display: none;">
-                      Tempo da partida: <strong id="spectator-timer-digits">03:00</strong>
-                    </span>
-                    <span class="ranking-status-badge" id="ranking-progress-text">Ao Vivo</span>
-                  </div>
+                  <h3>Ranking Geral</h3>
+                  <span class="ranking-status-badge" id="ranking-progress-text">0 participantes</span>
                 </div>
 
                 <div class="ranking-table-wrap">
-                  <table class="ranking-table" aria-label="Ranking dos participantes">
+                  <table class="ranking-table" aria-label="Ranking geral dos participantes">
                     <thead>
                       <tr>
                         <th>Pos.</th>
@@ -438,19 +344,16 @@
                 </div>
               </div>
 
-              <!-- Suas Respostas e Gabarito das 6 Questões -->
+              <!-- Gabarito e suas respostas -->
               <div class="final-choices-box" id="final-choices-box">
-                <h3 class="final-choices-title" id="final-choices-title">Gabarito e suas respostas na jornada:</h3>
+                <h3 class="final-choices-title">Gabarito e suas respostas na jornada:</h3>
                 <div class="final-choices-grid" id="final-choices-grid"></div>
               </div>
 
-              <!-- Ações Finais -->
+              <!-- Ação Final -->
               <div class="final-actions-bar">
-                <button type="button" class="btn-nav" id="btn-back-lobby" style="display: none;">
-                  <span>Voltar Sala para o Lobby</span>
-                </button>
                 <button type="button" class="btn-nav btn-nav-primary" id="btn-restart-quiz">
-                  <span>Sair / Nova Sala</span>
+                  <span>Voltar ao Início</span>
                 </button>
               </div>
             </div>
@@ -471,7 +374,7 @@
     </main>
   </div>
 
-  <!-- Modal de Confirmação Personalizado (Avançar sem responder / Confirmar Finalização) -->
+  <!-- Modal de Confirmação Personalizado -->
   <div class="confirm-modal-backdrop" id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" style="display: none;">
     <div class="confirm-modal-card">
       <h3 class="confirm-modal-title" id="confirm-modal-title">Confirmação</h3>
@@ -483,8 +386,6 @@
     </div>
   </div>
 
-  <!-- PeerJS para salas multiplayer em tempo real mesmo em hospedagem estática -->
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="script.js?v=20261118b"></script>
+  <script src="script.js?v=20261120a"></script>
 </body>
 </html>
